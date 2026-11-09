@@ -6,7 +6,7 @@
 #   script/check-offline.sh [path/to/Glance.app]
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-27.0.0.app/Contents/Developer}"
+source script/xcode-env.sh
 swift test --filter OfflineGuardTests 2>&1 | grep -E "error|failed|Executed" | tail -5
 swift test --filter OfflineGuardTests >/dev/null 2>&1 || { echo "check-offline: source checks failed" >&2; exit 1; }
 

@@ -13,7 +13,7 @@
 # (default "Developer ID Application: Steve Frost (4QJ25Y85MX)").
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-27.0.0.app/Contents/Developer}"
+source script/xcode-env.sh
 
 MODE=dev; INSTALL=0
 for a in "$@"; do

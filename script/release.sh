@@ -8,7 +8,7 @@
 # (script/release.sh notarize VERSION runs the dist folder's notarize.sh.)
 set -euo pipefail
 cd "$(dirname "$0")/.."
-export DEVELOPER_DIR="${DEVELOPER_DIR:-/Applications/Xcode-27.0.0.app/Contents/Developer}"
+source script/xcode-env.sh
 REPO=steveafrost/Glance
 die() { echo "release: $*" >&2; exit 1; }
 
