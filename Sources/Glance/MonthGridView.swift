@@ -1,5 +1,8 @@
 import AppKit
 import GlanceCore
+import os
+
+private let swipeLog = Logger(subsystem: "com.steveafrost.Glance", category: "swipe")
 
 /// The month grid, drawn by one layer-backed view: no per-cell views, so a
 /// month change is a single redraw with no layout work.
@@ -21,6 +24,7 @@ final class MonthGridView: NSView {
     var onDoubleClick: ((DayKey) -> Void)?
     var onHover: ((DayKey?, CGRect) -> Void)?
     var onCommand: ((GridCommand) -> Void)?
+    private var swipe = SwipeTracker()
 
     private var hovered: Int? {
         didSet { if hovered != oldValue { needsDisplay = true } }
@@ -160,6 +164,32 @@ final class MonthGridView: NSView {
         guard let i = model.geometry.index(at: p) else { return }
         let day = model.grid.days[i]
         if event.clickCount == 2 { onDoubleClick?(day) } else { onSelect?(day) }
+    }
+
+    // MARK: Trackpad swipe
+
+    /// Horizontal two-finger swipe over the grid changes month (once per gesture).
+    override func scrollWheel(with event: NSEvent) {
+        let outcome = swipe.handle(.init(
+            deltaX: event.scrollingDeltaX, deltaY: event.scrollingDeltaY,
+            phase: Self.phase(event.phase), isMomentum: event.momentumPhase != [],
+            hasPreciseDeltas: event.hasPreciseScrollingDeltas,
+            invertedFromDevice: event.isDirectionInvertedFromDevice))
+        switch outcome {
+        case .changeMonth(let n):
+            swipeLog.notice("swipe month \(n) natural=\(event.isDirectionInvertedFromDevice)")
+            onCommand?(.moveMonths(n))
+        case .consumed: break
+        case .passThrough: super.scrollWheel(with: event)
+        }
+    }
+
+    private static func phase(_ p: NSEvent.Phase) -> SwipeTracker.Phase {
+        if p.contains(.began) || p.contains(.mayBegin) { return .began }
+        if p.contains(.changed) || p.contains(.stationary) { return .changed }
+        if p.contains(.ended) { return .ended }
+        if p.contains(.cancelled) { return .cancelled }
+        return .none
     }
 
     // MARK: Keyboard

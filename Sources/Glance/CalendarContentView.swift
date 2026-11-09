@@ -5,9 +5,6 @@ import GlanceCore
 @MainActor
 final class CalendarContentView: NSView {
     let monthLabel = NSTextField(labelWithString: "")
-    let prevButton = CalendarContentView.iconButton("chevron.left", "Previous month")
-    let todayButton = CalendarContentView.iconButton("circle", "Today")
-    let nextButton = CalendarContentView.iconButton("chevron.right", "Next month")
     let addButton = CalendarContentView.iconButton("plus", "New event")
     let menuButton = CalendarContentView.iconButton("ellipsis.circle", "Options")
     let grid: MonthGridView
@@ -35,7 +32,7 @@ final class CalendarContentView: NSView {
         monthLabel.lineBreakMode = .byTruncatingTail
         divider.wantsLayer = true
         accessView.isHidden = true
-        [monthLabel, prevButton, todayButton, nextButton, addButton, menuButton, grid, divider, agenda, accessView].forEach(addSubview)
+        [monthLabel, addButton, menuButton, grid, divider, agenda, accessView].forEach(addSubview)
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
@@ -54,7 +51,7 @@ final class CalendarContentView: NSView {
 
     func apply(_ colors: ThemeColors) {
         monthLabel.textColor = colors.primaryText
-        [prevButton, todayButton, nextButton, addButton, menuButton].forEach { $0.contentTintColor = colors.secondaryText }
+        [addButton, menuButton].forEach { $0.contentTintColor = colors.secondaryText }
         divider.layer?.backgroundColor = colors.divider.cgColor
         accessView.apply(colors)
         grid.colors = colors
@@ -79,14 +76,12 @@ final class CalendarContentView: NSView {
     override func layout() {
         super.layout()
         let w = bounds.width
-        let bs: CGFloat = 19
-        var x = w
-        for b in [menuButton, nextButton, todayButton, prevButton, addButton] {
-            x -= bs
-            b.frame = CGRect(x: x, y: 4, width: bs, height: bs)
-            if b === prevButton { x -= 2 }
-        }
-        monthLabel.frame = CGRect(x: 6, y: 6, width: x - 8, height: 20)
+        // Month on the left, add and options on the right. Months change by
+        // trackpad swipe over the grid or the keyboard.
+        let bs: CGFloat = 22
+        menuButton.frame = CGRect(x: w - bs - 2, y: 4, width: bs, height: bs)
+        addButton.frame = CGRect(x: menuButton.frame.minX - bs - 2, y: 4, width: bs, height: bs)
+        monthLabel.frame = CGRect(x: 6, y: 6, width: addButton.frame.minX - 10, height: 20)
         let gs = grid.model.geometry.size
         grid.frame = CGRect(x: ((w - gs.width) / 2).rounded(), y: Self.headerHeight, width: gs.width, height: gs.height)
         let dividerY = grid.frame.maxY + Self.gapAboveDivider

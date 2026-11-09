@@ -91,6 +91,18 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
             var flags: NSEvent.ModifierFlags = []
             if parts.contains("shift") { flags.insert(.shift) }
             if parts.contains("cmd") { flags.insert(.command) }
+            if key.hasPrefix("swipe") {
+                // "swipe-left" / "swipe-right": a phased trackpad gesture plus momentum, fingers moving that way.
+                let fingersLeft = key == "swipe-left"
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    guard let self else { return }
+                    log.notice("qa \(String(token), privacy: .public)")
+                    for e in Self.qaSwipeEvents(fingersLeft: fingersLeft) { self.content.grid.scrollWheel(with: e) }
+                    log.notice("qa state month=\(self.month.description, privacy: .public)")
+                }
+                delay += 0.4
+                continue
+            }
             let (code, chars) = codes[key] ?? (0, key)
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 guard let self, let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
@@ -103,6 +115,27 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
             }
             delay += 0.4
         }
+    }
+
+    /// Scroll events for a QA swipe: began, 12 changed, ended, then 20 momentum events.
+    private static func qaSwipeEvents(fingersLeft: Bool) -> [NSEvent] {
+        // Synthesised events report isDirectionInvertedFromDevice == false
+        // (classic scrolling), where the raw delta is opposite to the fingers.
+        let dx: Int32 = fingersLeft ? 8 : -8
+        func make(_ d: Int32, phase: Int64, momentum: Int64) -> NSEvent? {
+            guard let cg = CGEvent(scrollWheelEvent2Source: nil, units: .pixel, wheelCount: 2, wheel1: 0, wheel2: d, wheel3: 0) else { return nil }
+            cg.setIntegerValueField(.scrollWheelEventIsContinuous, value: 1)
+            cg.setIntegerValueField(.scrollWheelEventScrollPhase, value: phase)
+            cg.setIntegerValueField(.scrollWheelEventMomentumPhase, value: momentum)
+            return NSEvent(cgEvent: cg)
+        }
+        var events = [make(0, phase: 1, momentum: 0)]
+        events += (0..<12).map { _ in make(dx, phase: 2, momentum: 0) }
+        events.append(make(0, phase: 4, momentum: 0))
+        events.append(make(dx * 3, phase: 0, momentum: 1))
+        events += (0..<20).map { _ in make(dx * 3, phase: 0, momentum: 2) }
+        events.append(make(0, phase: 0, momentum: 3))
+        return events.compactMap { $0 }
     }
 
     /// A second status item with the SF Symbol "calendar", for comparing
@@ -120,12 +153,6 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
         grid.onCommand = { [weak self] cmd in self?.perform(cmd) }
         grid.onHover = { [weak self] day, rect in self?.hover(day, rect: rect) }
 
-        content.prevButton.target = self
-        content.prevButton.action = #selector(prevMonth)
-        content.nextButton.target = self
-        content.nextButton.action = #selector(nextMonth)
-        content.todayButton.target = self
-        content.todayButton.action = #selector(goToday)
         content.addButton.target = self
         content.addButton.action = #selector(addEvent)
         content.menuButton.target = self
@@ -428,8 +455,6 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
         }
     }
 
-    @objc private func prevMonth() { perform(.moveMonths(-1)) }
-    @objc private func nextMonth() { perform(.moveMonths(1)) }
     @objc private func goToday() { select(today) }
     @objc private func addEvent() { newEvent(on: selected) }
 
