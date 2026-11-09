@@ -33,10 +33,13 @@ public enum PopoverPlacement {
         public var alwaysTopRight: Bool
         /// Fallback state from the previous placement while the window stays open.
         public var previous: Result?
+        /// Screen x the arrow should point at (the centre of the drawn date
+        /// box). Defaults to the item frame's midX.
+        public var arrowTargetX: CGFloat?
 
         public init(itemFrame: CGRect?, itemVisible: Bool, screens: [Screen], mainScreenIndex: Int = 0,
                     windowSize: CGSize, initialPresentation: Bool, alwaysTopRight: Bool = false,
-                    previous: Result? = nil) {
+                    previous: Result? = nil, arrowTargetX: CGFloat? = nil) {
             self.itemFrame = itemFrame
             self.itemVisible = itemVisible
             self.screens = screens
@@ -45,6 +48,7 @@ public enum PopoverPlacement {
             self.initialPresentation = initialPresentation
             self.alwaysTopRight = alwaysTopRight
             self.previous = previous
+            self.arrowTargetX = arrowTargetX
         }
     }
 
@@ -67,7 +71,8 @@ public enum PopoverPlacement {
         return screens.firstIndex { $0.frame.contains(probe) }
     }
 
-    public static func place(_ input: Input, arrowHalfWidth: CGFloat = 13, cornerRadius: CGFloat = 16) -> Result? {
+    public static func place(_ input: Input, arrowHalfWidth: CGFloat = PopoverShape.arrowHalfWidth,
+                             cornerRadius: CGFloat = 16) -> Result? {
         guard !input.screens.isEmpty else { return nil }
         var anchor = input.itemFrame ?? .zero
         var screenIdx = input.itemFrame.flatMap { screenIndex(for: $0, in: input.screens) }
@@ -99,15 +104,18 @@ public enum PopoverPlacement {
         let screen = input.screens[screenIdx ?? 0]
         anchor.origin.y = min(anchor.origin.y, screen.frame.maxY)
 
+        // Point at the drawn box, which needn't be the button's centre
+        // (clock text or the meeting glyph sit beside it).
+        let target = fallback ? anchor.midX : (input.arrowTargetX ?? anchor.midX)
         let w = input.windowSize.width
-        var x = (anchor.midX - w / 2).rounded()
+        var x = (target - w / 2).rounded()
         x = min(x, screen.frame.maxX - w - edgeMargin)
         x = max(x, screen.frame.minX + edgeMargin)
         let top = anchor.minY - gapBelowItem
         let maxHeight = max(0, top - (screen.visibleFrame.minY + edgeMargin))
         let h = min(input.windowSize.height, maxHeight)
 
-        var arrowX: CGFloat? = anchor.midX - x
+        var arrowX: CGFloat? = target - x
         if fallback { arrowX = nil }
         if let a = arrowX, a - arrowHalfWidth < cornerRadius || a + arrowHalfWidth > w - cornerRadius {
             arrowX = nil

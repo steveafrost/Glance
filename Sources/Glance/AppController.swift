@@ -299,6 +299,7 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
         var colors: ThemeColors!
         withAppearance(effective) { colors = ThemeColors.current(for: effective) }
         window.frameView.fillColor = colors.background
+        window.frameView.borderColor = colors.divider
         content.apply(colors)
         content.grid.needsDisplay = true
         refreshAll()
@@ -419,7 +420,8 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
         let input = PopoverPlacement.Input(
             itemFrame: status.screenFrame, itemVisible: status.isVisible, screens: screens, mainScreenIndex: mainIndex,
             windowSize: PopoverWindow.windowSize(forContent: wanted), initialPresentation: initial,
-            alwaysTopRight: prefs.alwaysTopRight, previous: initial ? nil : lastPlacement)
+            alwaysTopRight: prefs.alwaysTopRight, previous: initial ? nil : lastPlacement,
+            arrowTargetX: status.arrowTargetX)
         guard let result = PopoverPlacement.place(input) else { return }
         lastPlacement = result
 

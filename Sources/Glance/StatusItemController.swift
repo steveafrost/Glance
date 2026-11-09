@@ -14,7 +14,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// The widest clock string over the year (so the item's width never changes).
     private var widestClock = ""
     private var lengthCache: (key: String, length: CGFloat)?
-    private var iconCache: (key: String, image: NSImage)?
+    private var iconCache: (key: String, image: NSImage, box: CGRect?)?
     private var meetingActive = false
     private var lastPlacement: IconLayout.Placement?
     private var observers: [any NSObjectProtocol] = []
@@ -58,6 +58,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     }
 
     func setMeetingActive(_ active: Bool) {
+        // QA: keep the meeting glyph on to check alignment beside it.
+        let active = active || ProcessInfo.processInfo.arguments.contains("--qa-meeting")
         guard active != meetingActive else { return }
         meetingActive = active
         update()
@@ -109,9 +111,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private func icon(text: String?, meeting: Bool, placement: IconLayout.Placement) -> NSImage {
         let key = "\(text ?? "-")|\(prefs.iconStyle)|\(meeting)|\(placement)|\(prefs.iconOpticalOffset)"
         if let c = iconCache, c.key == key { return c.image }
-        let image = IconRenderer.image(text: text, style: prefs.iconStyle, meeting: meeting,
-                                       placement: placement, opticalOffset: prefs.iconOpticalOffset)
-        iconCache = (key, image)
+        let (image, layout) = IconRenderer.render(text: text, style: prefs.iconStyle, meeting: meeting,
+                                                  placement: placement, opticalOffset: prefs.iconOpticalOffset)
+        iconCache = (key, image, layout.boxRect)
         return image
     }
 
@@ -211,6 +213,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     var screenFrame: CGRect? {
         guard let button = item.button, let window = button.window else { return nil }
         return window.convertToScreen(button.convert(button.bounds, to: nil))
+    }
+
+    /// Screen x of the drawn date box's centre (where the calendar's arrow
+    /// points). Falls back to the button's centre with no box.
+    var arrowTargetX: CGFloat? {
+        guard let button = item.button, let window = button.window else { return nil }
+        var x = button.bounds.midX
+        if let image = button.image, let cache = iconCache, cache.image === image, let box = cache.box,
+           let cell = button.cell {
+            let imageRect = cell.imageRect(forBounds: button.bounds)
+            // The image is drawn unscaled; box.midX is in image coordinates.
+            x = imageRect.minX + box.midX * (imageRect.width / max(image.size.width, 1))
+        }
+        let p = button.convert(CGPoint(x: x, y: 0), to: nil)
+        return window.convertPoint(toScreen: p).x
     }
 
     var isVisible: Bool {

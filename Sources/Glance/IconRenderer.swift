@@ -25,6 +25,11 @@ enum IconRenderer {
 
     static func image(text: String?, style: IconLayout.Style, meeting: Bool,
                       placement: IconLayout.Placement, opticalOffset: CGFloat) -> NSImage {
+        render(text: text, style: style, meeting: meeting, placement: placement, opticalOffset: opticalOffset).image
+    }
+
+    static func render(text: String?, style: IconLayout.Style, meeting: Bool,
+                       placement: IconLayout.Placement, opticalOffset: CGFloat) -> (image: NSImage, layout: IconLayout) {
         var m = IconLayout.Metrics()
         m.opticalOffset = opticalOffset
         let layout = IconLayout(text: text.map { metrics(for: $0, style: style) }, showsMeeting: meeting,
@@ -61,7 +66,7 @@ enum IconRenderer {
             return true
         }
         image.isTemplate = true
-        return image
+        return (image, layout)
     }
 
     private static func drawMeetingGlyph(in rect: CGRect) {

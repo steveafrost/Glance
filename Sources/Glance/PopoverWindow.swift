@@ -1,11 +1,12 @@
 import AppKit
 import QuartzCore
+import GlanceCore
 
 /// A borderless, non-activating panel shaped like a popover: a rounded
 /// body with an arrow pointing at the status item.
 @MainActor
 final class PopoverWindow: NSPanel {
-    static let arrowHeight: CGFloat = 8
+    static let arrowHeight: CGFloat = PopoverShape.arrowHeight
     static let cornerRadius: CGFloat = 16
     static let padding: CGFloat = 8
 
@@ -47,13 +48,24 @@ final class PopoverWindow: NSPanel {
 @MainActor
 final class PopoverFrameView: NSView {
     private let shape = CAShapeLayer()
-    var arrowX: CGFloat? { didSet { needsLayout = true } }
+    private let border = CAShapeLayer()
+    /// Arrow apex along the top edge (window x); nil hides the arrow.
+    var arrowX: CGFloat? {
+        get { arrow?.edge == .top ? arrow?.position : nil }
+        set { arrow = newValue.map { PopoverShape.Arrow(edge: .top, position: $0) } }
+    }
+    var arrow: PopoverShape.Arrow? { didSet { needsLayout = true } }
     var fillColor: NSColor = .windowBackgroundColor { didSet { needsDisplay = true } }
+    var borderColor: NSColor = .clear { didSet { needsDisplay = true } }
 
     override init(frame: NSRect) {
         super.init(frame: frame)
         wantsLayer = true
         layer?.mask = shape
+        border.fillColor = nil
+        border.lineWidth = 2 // half of it is clipped by the mask: a 1pt inner hairline
+        border.zPosition = 1000
+        layer?.addSublayer(border)
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
@@ -62,36 +74,19 @@ final class PopoverFrameView: NSView {
 
     override func updateLayer() {
         layer?.backgroundColor = fillColor.cgColor
+        border.strokeColor = borderColor.cgColor
     }
 
     override func layout() {
         super.layout()
         CATransaction.begin()
         CATransaction.setDisableActions(true)
+        let path = PopoverShape.path(in: bounds, arrow: arrow, cornerRadius: PopoverWindow.cornerRadius)
         shape.frame = bounds
-        shape.path = Self.path(in: bounds, arrowX: arrowX)
+        shape.path = path
+        border.frame = bounds
+        border.path = path
         CATransaction.commit()
         window?.invalidateShadow()
-    }
-
-    /// Body plus arrow as one path, so the mask (and the system shadow) has no seam.
-    static func path(in bounds: CGRect, arrowX: CGFloat?) -> CGPath {
-        let h = PopoverWindow.arrowHeight, r = PopoverWindow.cornerRadius
-        let body = CGRect(x: bounds.minX, y: bounds.minY, width: bounds.width, height: bounds.height - h)
-        let path = CGMutablePath()
-        path.addRoundedRect(in: body, cornerWidth: r, cornerHeight: r)
-        if let x = arrowX {
-            let curve: CGFloat = 5
-            let top = body.maxY
-            path.move(to: CGPoint(x: x - h - curve, y: top - 1))
-            path.addLine(to: CGPoint(x: x - h - curve, y: top))
-            path.addCurve(to: CGPoint(x: x, y: top + h),
-                          control1: CGPoint(x: x - h, y: top), control2: CGPoint(x: x - curve * 0.6, y: top + h))
-            path.addCurve(to: CGPoint(x: x + h + curve, y: top),
-                          control1: CGPoint(x: x + curve * 0.6, y: top + h), control2: CGPoint(x: x + h, y: top))
-            path.addLine(to: CGPoint(x: x + h + curve, y: top - 1))
-            path.closeSubpath()
-        }
-        return path
     }
 }
