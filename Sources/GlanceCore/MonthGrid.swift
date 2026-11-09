@@ -1,8 +1,10 @@
 import Foundation
 
-/// The days shown for one month: always 6 rows of 7, so the grid's
-/// height never changes when the month does.
+/// The weeks of one month. `days` always holds 6 full rows of 7 (the
+/// range events are fetched for), but only `visibleRows` rows are shown,
+/// and only in-month cells are drawn: out-of-month slots stay empty.
 public struct MonthGrid: Sendable, Equatable {
+    /// The most rows a month can need.
     public static let rows = 6
     public static let columns = 7
 
@@ -31,15 +33,30 @@ public struct MonthGrid: Sendable, Equatable {
 
     public func isInMonth(_ day: DayKey) -> Bool { day.year == month.year && day.month == month.month }
 
+    /// Empty slots before the 1st in the first row (0...6), so the first
+    /// row always holds at least one day of the month.
+    public var leadingBlanks: Int { firstDay.days(until: month.firstDay) }
+
+    /// Rows the month covers: 4 to 6, depending on its length and first weekday.
+    public var visibleRows: Int { (leadingBlanks + month.numberOfDays + Self.columns - 1) / Self.columns }
+
+    /// Whether the cell at `index` shows a day (it belongs to this month).
+    public func isInMonth(index: Int) -> Bool {
+        (leadingBlanks..<(leadingBlanks + month.numberOfDays)).contains(index)
+    }
+
+    /// The day shown at `index`, or nil for an empty out-of-month slot.
+    public func visibleDay(at index: Int) -> DayKey? { isInMonth(index: index) ? days[index] : nil }
+
     /// Weekday (1 = Sunday) shown in `column`.
     public func weekday(forColumn column: Int) -> Int { (firstWeekday - 1 + column) % 7 + 1 }
 
     public func column(forWeekday weekday: Int) -> Int { (weekday - firstWeekday + 7) % 7 }
 
-    /// Week numbers for each row. Monday-start grids use ISO 8601
+    /// Week numbers for each visible row. Monday-start grids use ISO 8601
     /// numbering; other starts count the week containing 1 January as week 1.
     public func weekNumbers() -> [Int] {
-        (0..<Self.rows).map { WeekNumber.of(days[$0 * Self.columns], firstWeekday: firstWeekday) }
+        (0..<visibleRows).map { WeekNumber.of(days[$0 * Self.columns], firstWeekday: firstWeekday) }
     }
 }
 

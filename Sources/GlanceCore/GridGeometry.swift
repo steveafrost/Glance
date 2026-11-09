@@ -8,9 +8,12 @@ public struct GridGeometry: Equatable, Sendable {
     public var headerHeight: CGFloat
     public var weekColumnWidth: CGFloat
     public var showsWeekNumbers: Bool
+    /// Week rows shown (a month's `visibleRows`).
+    public var rows: Int
 
     public init(cellWidth: CGFloat = 33, cellHeight: CGFloat = 28, headerHeight: CGFloat = 20,
-                weekColumnWidth: CGFloat = 24, showsWeekNumbers: Bool = false) {
+                weekColumnWidth: CGFloat = 24, showsWeekNumbers: Bool = false, rows: Int = MonthGrid.rows) {
+        self.rows = min(max(rows, 1), MonthGrid.rows)
         self.cellWidth = cellWidth
         self.cellHeight = cellHeight
         self.headerHeight = headerHeight
@@ -22,7 +25,7 @@ public struct GridGeometry: Equatable, Sendable {
 
     public var size: CGSize {
         CGSize(width: gridOriginX + cellWidth * CGFloat(MonthGrid.columns),
-               height: headerHeight + cellHeight * CGFloat(MonthGrid.rows))
+               height: headerHeight + cellHeight * CGFloat(rows))
     }
 
     public func cellRect(index: Int) -> CGRect {
@@ -41,7 +44,7 @@ public struct GridGeometry: Equatable, Sendable {
         return CGRect(x: 0, y: headerHeight + CGFloat(row) * cellHeight, width: weekColumnWidth, height: cellHeight)
     }
 
-    /// The day column band (header plus all rows), for weekday highlighting.
+    /// The day column band (header plus the visible rows), for weekday highlighting.
     public func columnRect(column: Int) -> CGRect {
         CGRect(x: gridOriginX + CGFloat(column) * cellWidth, y: 0,
                width: cellWidth, height: size.height)
@@ -51,7 +54,7 @@ public struct GridGeometry: Equatable, Sendable {
         let x = point.x - gridOriginX, y = point.y - headerHeight
         guard x >= 0, y >= 0 else { return nil }
         let col = Int(x / cellWidth), row = Int(y / cellHeight)
-        guard col < MonthGrid.columns, row < MonthGrid.rows else { return nil }
+        guard col < MonthGrid.columns, row < rows else { return nil }
         return row * MonthGrid.columns + col
     }
 }

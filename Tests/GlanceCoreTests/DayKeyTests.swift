@@ -114,6 +114,59 @@ final class MonthGridTests: XCTestCase {
         }
     }
 
+    private func grid(_ y: Int, _ m: Int, _ fw: Int) -> MonthGrid { MonthGrid(month: MonthKey(year: y, month: m), firstWeekday: fw) }
+
+    func testFourRowFebruary() {
+        // 1 Feb 2026 is a Sunday and February has 28 days.
+        let g = grid(2026, 2, 1)
+        XCTAssertEqual(g.leadingBlanks, 0)
+        XCTAssertEqual(g.visibleRows, 4)
+        XCTAssertEqual(g.visibleDay(at: 27), DayKey(year: 2026, month: 2, day: 28))
+        XCTAssertNil(g.visibleDay(at: 28))
+        XCTAssertEqual(g.weekNumbers().count, 4)
+        // Monday start pushes the 1st to the last column: 5 rows.
+        XCTAssertEqual(grid(2026, 2, 2).leadingBlanks, 6)
+        XCTAssertEqual(grid(2026, 2, 2).visibleRows, 5)
+    }
+
+    func testFiveRowNovember() {
+        // November 2026 with a Sunday start ends on Monday 30 in row 5; the
+        // all-December sixth row (6–12 Dec) isn't shown.
+        let g = grid(2026, 11, 1)
+        XCTAssertEqual(g.visibleRows, 5)
+        XCTAssertTrue(g.isInMonth(index: 29))
+        for i in 30..<42 { XCTAssertFalse(g.isInMonth(index: i), "\(i)") }
+        XCTAssertNil(g.visibleDay(at: 30))
+        // Monday start leads with six October slots and needs 6 rows.
+        let m = grid(2026, 11, 2)
+        XCTAssertEqual(m.visibleRows, 6)
+        for i in 0..<6 { XCTAssertNil(m.visibleDay(at: i)) }
+        XCTAssertEqual(m.visibleDay(at: 6), DayKey(year: 2026, month: 11, day: 1))
+    }
+
+    func testSixRowAugust() {
+        // 1 Aug 2026 is a Saturday; 31 days spill into a sixth row.
+        XCTAssertEqual(grid(2026, 8, 1).visibleRows, 6)
+        XCTAssertEqual(grid(2026, 8, 1).visibleDay(at: 36), DayKey(year: 2026, month: 8, day: 31))
+        XCTAssertEqual(grid(2026, 8, 2).visibleRows, 6)
+    }
+
+    func testNoRowIsEntirelyOutOfMonth() {
+        for fw in 1...7 {
+            for y in 2025...2028 {
+                for m in 1...12 {
+                    let g = grid(y, m, fw)
+                    XCTAssertTrue((4...6).contains(g.visibleRows))
+                    for row in 0..<g.visibleRows {
+                        XCTAssertTrue((0..<7).contains { g.isInMonth(index: row * 7 + $0) }, "\(y)-\(m) fw\(fw) row \(row)")
+                    }
+                    for i in 0..<42 { XCTAssertEqual(g.isInMonth(index: i), g.isInMonth(g.days[i])) }
+                    XCTAssertEqual((0..<42).filter(g.isInMonth(index:)).count, g.month.numberOfDays)
+                }
+            }
+        }
+    }
+
     func testGridWeekNumbers() {
         let g = MonthGrid(month: MonthKey(year: 2027, month: 1), firstWeekday: 2)
         // 2027-01-01 is a Friday; ISO week 53 of 2026.

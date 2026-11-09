@@ -367,7 +367,8 @@ final class AppController: NSObject, NSWindowDelegate {
                 dots[day] = colors
             }
         }
-        let geometry = GridGeometry(showsWeekNumbers: prefs.showWeekNumbers)
+        let geometry = GridGeometry(showsWeekNumbers: prefs.showWeekNumbers, rows: grid.visibleRows)
+        let rowsChanged = geometry.rows != content.grid.model.geometry.rows
         content.grid.model = .init(grid: grid, selected: selected, today: today,
                                    highlighted: prefs.highlightedWeekdays, dots: dots, geometry: geometry)
 
@@ -397,6 +398,7 @@ final class AppController: NSObject, NSWindowDelegate {
         content.agenda.setRows(Agenda.rows(eventsByDay: byDay, start: selected, days: prefs.agendaDays,
                                            showEmptyDays: prefs.showEmptyAgendaDays))
         updateMeetingState()
+        if rowsChanged { content.needsLayout = true }
         if window.isVisible { positionWindow(initial: false) }
     }
 

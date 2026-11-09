@@ -18,6 +18,15 @@ final class GridGeometryTests: XCTestCase {
         XCTAssertEqual(GridGeometry(showsWeekNumbers: true).size.width, 255)
         XCTAssertNil(GridGeometry(showsWeekNumbers: false).weekNumberRect(row: 0))
     }
+
+    func testRowCountDrivesHeightAndHitTesting() {
+        let five = GridGeometry(rows: 5), four = GridGeometry(rows: 4)
+        XCTAssertEqual(five.size.height, five.headerHeight + 5 * five.cellHeight)
+        XCTAssertEqual(four.columnRect(column: 0).height, four.size.height)
+        let r = five.cellRect(index: 35) // first cell of a sixth row
+        XCTAssertNil(five.index(at: CGPoint(x: r.midX, y: r.midY)))
+        XCTAssertEqual(five.index(at: CGPoint(x: r.midX, y: r.midY - five.cellHeight)), 28)
+    }
 }
 
 final class GridNavigationTests: XCTestCase {

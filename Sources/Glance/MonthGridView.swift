@@ -87,7 +87,8 @@ final class MonthGridView: NSView {
 
         let dayFont = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
         let todayFont = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
-        for (i, day) in grid.days.enumerated() {
+        // Only the month's own days; out-of-month slots stay empty.
+        for (i, day) in grid.days.enumerated() where grid.isInMonth(index: i) {
             let cell = g.cellRect(index: i)
             guard cell.intersects(dirtyRect) else { continue }
             let pill = cell.insetBy(dx: 2, dy: 2)
@@ -105,7 +106,7 @@ final class MonthGridView: NSView {
                 (isToday ? colors.onToday : colors.selection).setStroke()
                 ring.stroke()
             }
-            let textColor = isToday ? colors.onToday : (grid.isInMonth(day) ? colors.primaryText : colors.otherMonthText)
+            let textColor = isToday ? colors.onToday : colors.primaryText
             var textRect = cell
             textRect.origin.y -= 2
             drawCentered(String(day.day), in: textRect, font: isToday ? todayFont : dayFont, color: textColor)
@@ -148,7 +149,7 @@ final class MonthGridView: NSView {
 
     private func updateHover(_ event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
-        let i = model.geometry.index(at: p)
+        let i = model.geometry.index(at: p).flatMap { model.grid.isInMonth(index: $0) ? $0 : nil }
         guard i != hovered else { return }
         hovered = i
         if let i {
@@ -161,8 +162,7 @@ final class MonthGridView: NSView {
     override func mouseDown(with event: NSEvent) {
         window?.makeFirstResponder(self)
         let p = convert(event.locationInWindow, from: nil)
-        guard let i = model.geometry.index(at: p) else { return }
-        let day = model.grid.days[i]
+        guard let i = model.geometry.index(at: p), let day = model.grid.visibleDay(at: i) else { return }
         if event.clickCount == 2 { onDoubleClick?(day) } else { onSelect?(day) }
     }
 
