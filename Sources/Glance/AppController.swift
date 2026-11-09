@@ -29,6 +29,9 @@ final class AppController: NSObject, NSWindowDelegate {
     private var referenceItem: NSStatusItem?
     /// `--keep-open`: don't hide on losing focus (for screenshots while testing).
     private let keepOpenForQA = ProcessInfo.processInfo.arguments.contains("--keep-open")
+    /// `--qa-passive`: show without becoming the key window, so typing in
+    /// other apps never lands in Glance during QA (QA keys still reach the grid).
+    private let passiveForQA = ProcessInfo.processInfo.arguments.contains("--qa-passive")
 
     override init() {
         let cal = Calendar.autoupdatingCurrent
@@ -80,6 +83,14 @@ final class AppController: NSObject, NSWindowDelegate {
             // QA: after showing, feed key events (e.g. "right,shift+down,return") through the panel.
             let script = args[i + 1]
             DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.sendQAKeys(script) }
+        }
+        if let i = args.firstIndex(of: "--qa-day"), i + 1 < args.count {
+            // QA: start on this day (YYYY-MM-DD) instead of today, with no key presses.
+            let p = args[i + 1].split(separator: "-").compactMap { Int($0) }
+            if p.count == 3 {
+                selected = DayKey(year: p[0], month: p[1], day: p[2])
+                month = selected.monthKey
+            }
         }
         if args.contains("--show") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.showCalendar() }
@@ -426,7 +437,7 @@ final class AppController: NSObject, NSWindowDelegate {
         refreshAll()
         positionWindow(initial: true)
         NSApp.unhideWithoutActivation()
-        window.makeKeyAndOrderFront(nil)
+        if passiveForQA { window.orderFrontRegardless() } else { window.makeKeyAndOrderFront(nil) }
         window.makeFirstResponder(content.grid)
         log.notice("show frame=\(NSStringFromRect(self.window.frame), privacy: .public) key=\(self.window.isKeyWindow)")
     }

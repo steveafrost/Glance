@@ -26,8 +26,12 @@ extension MonthGridView {
                 "ringInner": [l.ringInner.minX, l.ringInner.maxX],
             ])
         }
+        // Agenda top, in points from the window's top edge.
+        let agendaTop = (superview as? CalendarContentView).map { c -> CGFloat in
+            winHeight - c.agenda.convert(c.agenda.bounds, to: nil).maxY
+        } ?? -1
         let info: [String: Any] = ["month": m.grid.month.description, "windowHeight": winHeight,
-                                   "gridSize": [bounds.width, bounds.height], "cells": cells]
+                                   "gridSize": [bounds.width, bounds.height], "agendaTop": agendaTop, "cells": cells]
         let pb = NSPasteboard(name: Self.qaPasteboard)
         pb.clearContents()
         pb.setData(try? JSONSerialization.data(withJSONObject: info, options: [.sortedKeys]),

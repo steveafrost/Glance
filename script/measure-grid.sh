@@ -9,7 +9,7 @@ OUT=$1; LABEL=$2; THEME=$3; KEYS=$4; shift 4
 HERE=$(cd "$(dirname "$0")" && pwd)
 mkdir -p "$OUT/$LABEL"
 pkill -x Glance || true; sleep 0.5
-open /Applications/Glance.app --args --show --keep-open -theme "$THEME" --qa-keys "${KEYS:+$KEYS,}dump-grid" "$@"
+open -g /Applications/Glance.app --args --show --keep-open --qa-passive -theme "$THEME" --qa-keys "${KEYS:+$KEYS,}dump-grid" "$@"
 sleep "${WAIT:-5}"
 # The calendar popover is the Glance window at layer 24.
 id=$(swift "$HERE/measure-grid-window.swift")
