@@ -12,10 +12,23 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         let host = NSHostingController(rootView: SettingsView(state: state))
         let window = NSWindow(contentViewController: host)
         window.title = "Glance Settings"
-        window.styleMask = [.titled, .closable]
+        // The title bar blends into the mantle background: no grey band.
+        window.styleMask = [.titled, .closable, .fullSizeContentView]
+        window.titlebarAppearsTransparent = true
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
+        state.onThemeChange = { [weak self] in self?.applyTheme() }
+        applyTheme()
+    }
+
+    /// Latte draws native controls in aqua, the dark flavours in darkAqua;
+    /// Auto and System follow macOS.
+    private func applyTheme() {
+        guard let window else { return }
+        window.appearance = ThemeColors.forcedAppearance
+        window.contentViewController?.view.appearance = ThemeColors.forcedAppearance
+        window.backgroundColor = state.palette.nsMantle
     }
 
     @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
@@ -47,10 +60,30 @@ final class SettingsState: ObservableObject {
     @Published var groups: [CalendarSourceGroup] = []
     @Published var selected: Set<String> = []
     @Published var accessGranted = false
+    @Published private(set) var palette = SettingsPalette.current()
+    var onThemeChange: (() -> Void)?
+    private var observers: [Any] = []
 
     init(model: CalendarModel) {
         self.model = model
         reload()
+        // Follow theme changes live, and macOS light/dark for Auto and System.
+        observers.append(NotificationCenter.default.addObserver(forName: Preferences.didChange, object: nil, queue: .main) { [weak self] n in
+            let key = n.userInfo?["key"] as? String
+            MainActor.assumeIsolated {
+                self?.objectWillChange.send()
+                if key == "theme" { self?.refreshPalette() }
+            }
+        })
+        observers.append(NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
+            DispatchQueue.main.async { self?.refreshPalette() }
+        })
+    }
+
+    private func refreshPalette() {
+        let p = SettingsPalette.current()
+        if p != palette { palette = p }
+        onThemeChange?()
     }
 
     func reload() {
@@ -95,6 +128,10 @@ struct SettingsView: View {
         }
         // Grouped forms in a TabView have no intrinsic height; size explicitly.
         .frame(width: 500, height: 560)
+        .environment(\.palette, state.palette)
+        .tint(state.palette.accent)
+        .foregroundStyle(state.palette.text)
+        .background(state.palette.mantle)
     }
 }
 
@@ -141,6 +178,7 @@ private struct GeneralSettings: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 }
 
@@ -200,6 +238,7 @@ private struct AppearanceSettings: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 
     private var orderedWeekdays: [Int] {
@@ -242,6 +281,7 @@ private struct CalendarSettings: View {
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)
     }
 }
 
