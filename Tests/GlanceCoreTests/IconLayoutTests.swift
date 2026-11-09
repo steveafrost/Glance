@@ -6,7 +6,8 @@ final class IconLayoutTests: XCTestCase {
 
     func testSixteenPointBoxIsCentredOnThirtyPointBar() {
         // Whatever the button's position, the box covers rows 7–22 of a 30pt bar.
-        for (height, top) in [(CGFloat(30), CGFloat(0)), (22, 4), (24, 3), (22, 3)] {
+        // (30, -1) is what macOS 27 reports: a 30pt button poking 1pt above the screen.
+        for (height, top) in [(CGFloat(30), CGFloat(0)), (30, -1), (22, 4), (24, 3), (22, 3)] {
             let p = IconLayout.Placement(barHeight: 30, buttonHeight: height, buttonTop: top)
             let layout = IconLayout(text: digits, showsMeeting: false, placement: p)
             XCTAssertEqual(layout.boxRows(placement: p), 7...22, "button \(height)@\(top)")
