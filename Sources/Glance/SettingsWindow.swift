@@ -2,24 +2,83 @@ import AppKit
 import GlanceCore
 import SwiftUI
 
-/// Settings: a SwiftUI form in an AppKit window, created on first use.
+enum SettingsTab: String, CaseIterable, Identifiable {
+    case general, appearance, calendars
+    var id: String { rawValue }
+    var title: String {
+        switch self {
+        case .general: "General"
+        case .appearance: "Appearance"
+        case .calendars: "Calendars"
+        }
+    }
+    var symbol: String {
+        switch self {
+        case .general: "gearshape"
+        case .appearance: "paintpalette"
+        case .calendars: "calendar"
+        }
+    }
+}
+
+/// Settings: SwiftUI tabs in an AppKit window with Settings-style toolbar
+/// tabs. The window takes each tab's natural height and animates between
+/// them; a tab only scrolls when it can't fit on screen.
 @MainActor
-final class SettingsWindowController: NSWindowController, NSWindowDelegate {
+final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate {
+    static let contentWidth: CGFloat = 520
     private let state: SettingsState
 
     init(model: CalendarModel) {
         state = SettingsState(model: model)
         let host = NSHostingController(rootView: SettingsView(state: state))
-        let window = NSWindow(contentViewController: host)
-        window.title = "Glance Settings"
+        host.sizingOptions = []
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: Self.contentWidth, height: 400),
+                              styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: true)
+        window.contentViewController = host
         // The title bar blends into the mantle background: no grey band.
-        window.styleMask = [.titled, .closable, .fullSizeContentView]
         window.titlebarAppearsTransparent = true
+        window.toolbarStyle = .preference
         window.isReleasedWhenClosed = false
         super.init(window: window)
         window.delegate = self
+
+        let toolbar = NSToolbar(identifier: "GlanceSettings")
+        toolbar.delegate = self
+        // Each tab is a view-based item so the selected one can take the accent.
+        toolbar.displayMode = .iconOnly
+        toolbar.centeredItemIdentifiers = Set(SettingsTab.allCases.map { NSToolbarItem.Identifier($0.rawValue) })
+        toolbar.allowsUserCustomization = false
+        window.toolbar = toolbar
+        select(.general, animate: false)
+
         state.onThemeChange = { [weak self] in self?.applyTheme() }
+        state.onContentHeight = { [weak self] _ in self?.fitWindow(animate: true) }
         applyTheme()
+    }
+
+    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+
+    func show() {
+        state.reload()
+        NSApp.activate()
+        if window?.isVisible != true {
+            fitWindow(animate: false)
+            window?.center()
+        }
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
+    }
+
+    func showHotKeyError(_ message: String) { state.hotKeyError = message }
+
+    func selectTab(named name: String) {
+        if let tab = SettingsTab(rawValue: name) { select(tab, animate: true) }
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        // Make sure a recorder never leaves the hotkey unregistered.
+        HotKeyCenter.shared.register(Preferences.shared.hotKey)
     }
 
     /// Latte draws native controls in aqua, the dark flavours in darkAqua;
@@ -29,23 +88,68 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate {
         window.appearance = ThemeColors.forcedAppearance
         window.contentViewController?.view.appearance = ThemeColors.forcedAppearance
         window.backgroundColor = state.palette.nsMantle
+        refreshToolbarImages()
     }
 
-    @available(*, unavailable) required init?(coder: NSCoder) { fatalError() }
+    // MARK: Tabs
 
-    func show() {
-        state.reload()
-        NSApp.activate()
-        window?.center()
-        showWindow(nil)
-        window?.makeKeyAndOrderFront(nil)
+    private func select(_ tab: SettingsTab, animate: Bool) {
+        state.tab = tab
+        window?.title = tab.title
+        refreshToolbarImages()
+        // The new tab reports its height once laid out; fitWindow follows.
+        if !animate { fitWindow(animate: false) }
     }
 
-    func showHotKeyError(_ message: String) { state.hotKeyError = message }
+    private func tabClicked(_ tab: SettingsTab) {
+        guard tab != state.tab else { return }
+        select(tab, animate: true)
+    }
 
-    func windowWillClose(_ notification: Notification) {
-        // Make sure a recorder never leaves the hotkey unregistered.
-        HotKeyCenter.shared.register(Preferences.shared.hotKey)
+    /// Tab views observe the state, so they restyle themselves.
+    private func refreshToolbarImages() {}
+
+    nonisolated func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        SettingsTab.allCases.map { NSToolbarItem.Identifier($0.rawValue) }
+    }
+    nonisolated func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
+        toolbarAllowedItemIdentifiers(toolbar)
+    }
+
+    nonisolated func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier id: NSToolbarItem.Identifier,
+                             willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+        MainActor.assumeIsolated {
+            guard let tab = SettingsTab(rawValue: id.rawValue) else { return nil }
+            let item = NSToolbarItem(itemIdentifier: id)
+            item.label = tab.title
+            let view = NSHostingView(rootView: SettingsTabButton(tab: tab, state: state) { [weak self] in self?.tabClicked(tab) })
+            view.frame.size = view.fittingSize
+            item.view = view
+            return item
+        }
+    }
+
+    // MARK: Sizing
+
+    /// Height of the title bar and toolbar above the content.
+    private var chromeHeight: CGFloat {
+        guard let window else { return 0 }
+        return window.frame.height - window.contentLayoutRect.height
+    }
+
+    private func fitWindow(animate: Bool) {
+        guard let window, let natural = state.contentHeights[state.tab] else { return }
+        let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? .zero
+        let fit = SettingsModel.contentHeight(natural: natural, available: visible.height - chromeHeight - 40)
+        if state.scrolls != fit.scrolls { state.scrolls = fit.scrolls }
+        let height = fit.height + chromeHeight
+        var frame = window.frame
+        guard abs(frame.height - height) > 0.5 || abs(frame.width - Self.contentWidth) > 0.5 else { return }
+        // Keep the top edge still, like System Settings.
+        frame.origin.y = frame.maxY - height
+        frame.size = CGSize(width: Self.contentWidth, height: height)
+        if frame.minY < visible.minY { frame.origin.y = visible.minY }
+        window.setFrame(frame, display: true, animate: animate && window.isVisible)
     }
 }
 
@@ -61,7 +165,18 @@ final class SettingsState: ObservableObject {
     @Published var selected: Set<String> = []
     @Published var accessGranted = false
     @Published private(set) var palette = SettingsPalette.current()
+    @Published var tab: SettingsTab = .general
+    /// Whether the current tab is taller than the screen allows.
+    @Published var scrolls = false
+    private(set) var contentHeights: [SettingsTab: CGFloat] = [:]
     var onThemeChange: (() -> Void)?
+    var onContentHeight: ((SettingsTab) -> Void)?
+
+    func reportHeight(_ h: CGFloat, for tab: SettingsTab) {
+        guard h > 0, abs((contentHeights[tab] ?? 0) - h) > 0.5 else { return }
+        contentHeights[tab] = h
+        if tab == self.tab { onContentHeight?(tab) }
+    }
     private var observers: [Any] = []
 
     init(model: CalendarModel) {
@@ -117,21 +232,70 @@ final class SettingsState: ObservableObject {
     }
 }
 
+/// A Settings toolbar tab: SF Symbol over its label, the selected one in the
+/// accent colour on a surface0 pill.
+struct SettingsTabButton: View {
+    let tab: SettingsTab
+    @ObservedObject var state: SettingsState
+    let action: () -> Void
+
+    var body: some View {
+        let p = state.palette
+        let selected = state.tab == tab
+        Button(action: action) {
+            VStack(spacing: 3) {
+                Image(systemName: tab.symbol).font(.system(size: 17, weight: .regular)).frame(height: 20)
+                Text(tab.title).font(.system(size: 11, weight: selected ? .semibold : .regular))
+            }
+            .foregroundStyle(selected ? p.accent : p.subtext0)
+            .frame(width: 78, height: 46)
+            .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(selected ? p.surface0 : .clear))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(tab.title)
+        .accessibilityAddTraits(selected ? .isSelected : [])
+    }
+}
+
+private struct ContentHeightKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) { value = max(value, nextValue()) }
+}
+
 struct SettingsView: View {
     @ObservedObject var state: SettingsState
 
     var body: some View {
-        TabView {
-            GeneralSettings(state: state).tabItem { Label("General", systemImage: "gearshape") }
-            AppearanceSettings(state: state).tabItem { Label("Appearance", systemImage: "paintpalette") }
-            CalendarSettings(state: state).tabItem { Label("Calendars", systemImage: "calendar") }
+        ScrollView(.vertical) {
+            content
+                .padding(.horizontal, 20)
+                .padding(.top, 16)
+                .padding(.bottom, 20)
+                .frame(width: SettingsWindowController.contentWidth, alignment: .top)
+                .fixedSize(horizontal: false, vertical: true)
+                .background(GeometryReader { g in
+                    Color.clear.preference(key: ContentHeightKey.self, value: g.size.height)
+                })
         }
-        // Grouped forms in a TabView have no intrinsic height; size explicitly.
-        .frame(width: 500, height: 560)
+        .scrollIndicators(state.scrolls ? .visible : .never)
+        .scrollDisabled(!state.scrolls)
+        .onPreferenceChange(ContentHeightKey.self) { h in
+            MainActor.assumeIsolated { state.reportHeight(h, for: state.tab) }
+        }
+        .id(state.tab)
         .environment(\.palette, state.palette)
         .tint(state.palette.accent)
         .foregroundStyle(state.palette.text)
         .background(state.palette.mantle)
+    }
+
+    @ViewBuilder private var content: some View {
+        switch state.tab {
+        case .general: GeneralSettings(state: state)
+        case .appearance: AppearanceSettings(state: state)
+        case .calendars: CalendarSettings(state: state)
+        }
     }
 }
 
@@ -139,7 +303,7 @@ private struct GeneralSettings: View {
     @ObservedObject var state: SettingsState
 
     var body: some View {
-        Form {
+        VStack(alignment: .leading, spacing: 12) {
             Section {
                 Toggle("Open at login", isOn: Binding(get: { state.launchAtLogin }, set: { state.setLaunchAtLogin($0) }))
                 if let error = state.loginError {
@@ -177,8 +341,7 @@ private struct GeneralSettings: View {
                 Toggle("Show days without events", isOn: state.binding(\.showEmptyAgendaDays))
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
+
     }
 }
 
@@ -210,7 +373,7 @@ private struct AppearanceSettings: View {
     private let weekdays = Calendar.autoupdatingCurrent.weekdaySymbols
 
     var body: some View {
-        Form {
+        VStack(alignment: .leading, spacing: 12) {
             Picker("Theme", selection: state.binding(\.theme)) {
                 ForEach(ThemeChoice.allCases, id: \.self) { Text($0.displayName).tag($0) }
             }
@@ -237,8 +400,7 @@ private struct AppearanceSettings: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
+
     }
 
     private var orderedWeekdays: [Int] {
@@ -251,7 +413,7 @@ private struct CalendarSettings: View {
     @ObservedObject var state: SettingsState
 
     var body: some View {
-        Form {
+        VStack(alignment: .leading, spacing: 12) {
             if !state.accessGranted {
                 Text("Glance doesn’t have access to your calendars. Turn on Full Access for Glance in System Settings › Privacy & Security › Calendars.")
                     .foregroundStyle(.secondary)
@@ -280,8 +442,7 @@ private struct CalendarSettings: View {
                 }
             }
         }
-        .formStyle(.grouped)
-        .scrollContentBackground(.hidden)
+
     }
 }
 

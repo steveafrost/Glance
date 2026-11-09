@@ -99,6 +99,16 @@ final class AppController: NSObject, NSWindowDelegate {
             var flags: NSEvent.ModifierFlags = []
             if parts.contains("shift") { flags.insert(.shift) }
             if parts.contains("cmd") { flags.insert(.command) }
+            if key.hasPrefix("tab-") {
+                // Switch the Settings tab: tab-general, tab-appearance, tab-calendars.
+                let name = String(key.dropFirst(4))
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    self?.settings?.selectTab(named: name)
+                    log.notice("qa \(String(token), privacy: .public)")
+                }
+                delay += 0.8
+                continue
+            }
             if key == "edit-first" {
                 // Open the editor on the first timed agenda event (no changes are saved).
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
