@@ -14,6 +14,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     /// The widest clock string over the year (so the item's width never changes).
     private var widestClock = ""
     private var lengthCache: (key: String, length: CGFloat)?
+    private var iconCache: (key: String, image: NSImage)?
     private var meetingActive = false
     private var lastPlacement: IconLayout.Placement?
     private var observers: [any NSObjectProtocol] = []
@@ -71,12 +72,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         let placement = currentPlacement()
         lastPlacement = placement
 
-        if iconText != nil || showMeeting {
-            button.image = IconRenderer.image(text: iconText, style: prefs.iconStyle, meeting: showMeeting,
-                                              placement: placement, opticalOffset: prefs.iconOpticalOffset)
-        } else {
-            button.image = nil
-        }
+        let image = (iconText != nil || showMeeting)
+            ? icon(text: iconText, meeting: showMeeting, placement: placement) : nil
+        if button.image !== image { button.image = image }
 
         var title = ""
         if !clock.isEmpty {
@@ -94,8 +92,7 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             item.length = NSStatusItem.variableLength
             if button.image == nil {
                 // Nothing to show: keep a minimal glyph so the item stays clickable.
-                button.image = IconRenderer.image(text: String(day), style: prefs.iconStyle, meeting: false,
-                                                  placement: placement, opticalOffset: prefs.iconOpticalOffset)
+                button.image = icon(text: String(day), meeting: false, placement: placement)
             }
         }
 
@@ -105,6 +102,17 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         if showMeeting { label += ", meeting now" }
         button.setAccessibilityLabel(label)
         button.toolTip = nil
+    }
+
+    /// The icon only changes with the day, style, meeting state or placement,
+    /// so clock ticks reuse the same image.
+    private func icon(text: String?, meeting: Bool, placement: IconLayout.Placement) -> NSImage {
+        let key = "\(text ?? "-")|\(prefs.iconStyle)|\(meeting)|\(placement)|\(prefs.iconOpticalOffset)"
+        if let c = iconCache, c.key == key { return c.image }
+        let image = IconRenderer.image(text: text, style: prefs.iconStyle, meeting: meeting,
+                                       placement: placement, opticalOffset: prefs.iconOpticalOffset)
+        iconCache = (key, image)
+        return image
     }
 
     private var clockFont: NSFont {
