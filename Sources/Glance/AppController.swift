@@ -54,6 +54,11 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
         model.onChange = { [weak self] in self?.dataChanged() }
         HotKeyCenter.shared.onPress = { [weak self] in self?.toggleCalendar() }
         if let message = HotKeyCenter.shared.register(prefs.hotKey) { log.error("hotkey: \(message, privacy: .public)") }
+        if ProcessInfo.processInfo.arguments.contains("--qa-hotkey") {
+            // QA: ⌃⌥⌘G for this run only (not saved).
+            let combo = KeyCombo(keyCode: 5, carbonModifiers: KeyCombo.cmdKey | KeyCombo.optionKey | KeyCombo.controlKey)
+            log.notice("qa hotkey register: \(HotKeyCenter.shared.register(combo) ?? "ok", privacy: .public)")
+        }
 
         wireContent()
         applyTheme()
@@ -91,6 +96,17 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
             var flags: NSEvent.ModifierFlags = []
             if parts.contains("shift") { flags.insert(.shift) }
             if parts.contains("cmd") { flags.insert(.command) }
+            if key == "hover" {
+                // Hover today's cell as if the pointer were over it.
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    guard let self else { return }
+                    let rect = self.content.grid.convert(self.cellRect(for: self.today), to: nil)
+                    self.content.grid.onHover?(self.today, rect)
+                    log.notice("qa hover \(self.today.description, privacy: .public)")
+                }
+                delay += 0.4
+                continue
+            }
             if key.hasPrefix("swipe") {
                 // "swipe-left" / "swipe-right": a phased trackpad gesture plus momentum, fingers moving that way.
                 let fingersLeft = key == "swipe-left"
@@ -356,6 +372,7 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
     // MARK: Window
 
     func toggleCalendar() {
+        log.notice("toggle (visible=\(self.window.isVisible))")
         if window.isVisible && window.occlusionState.contains(.visible) {
             // Clicking the item on another display moves the window there.
             if let frame = status.screenFrame, let idx = PopoverPlacement.screenIndex(for: frame, in: screens),
