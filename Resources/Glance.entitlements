@@ -6,5 +6,12 @@
     <true/>
     <key>com.apple.security.personal-information.calendars</key>
     <true/>
+    <!-- Sparkle's installer tools (sandboxing guide). No network.client:
+         Sparkle's Downloader XPC service does the fetching. -->
+    <key>com.apple.security.temporary-exception.mach-lookup.global-name</key>
+    <array>
+        <string>com.steveafrost.Glance-spks</string>
+        <string>com.steveafrost.Glance-spki</string>
+    </array>
 </dict>
 </plist>

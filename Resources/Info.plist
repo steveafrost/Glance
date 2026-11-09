@@ -38,5 +38,17 @@
     <false/>
     <key>NSSupportsSuddenTermination</key>
     <true/>
+    <!-- Sparkle 2 (sandboxed). Feed comes from the build (GLANCE_FEED_URL);
+         dev builds get a .invalid placeholder and never check. -->
+    <key>SUFeedURL</key>
+    <string>__FEED_URL__</string>
+    <key>SUPublicEDKey</key>
+    <string>mAqqD+TBv/3BULujwVHcfw3oCo8kOAhatC6IZ0J7XYo=</string>
+    <key>SUEnableAutomaticChecks</key>
+    <true/>
+    <key>SUEnableInstallerLauncherService</key>
+    <true/>
+    <key>SUEnableDownloaderService</key>
+    <true/>
 </dict>
 </plist>

@@ -541,6 +541,7 @@ final class AppController: NSObject, NSWindowDelegate {
         })
         menu.addItem(.separator())
         menu.addItem(ClosureMenuItem(title: "Settings…") { [weak self] in self?.openSettings(nil) })
+        menu.addItem(Updater.shared.menuItem())
         menu.addItem(.separator())
         menu.addItem(withTitle: "Quit Glance", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "")
         menu.popUp(positioning: nil, at: CGPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
