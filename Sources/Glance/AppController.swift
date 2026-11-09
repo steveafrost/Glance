@@ -69,8 +69,39 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
                 log.notice("geometry \(self.status.geometryDescription(), privacy: .public)")
             }
         }
+        if let i = args.firstIndex(of: "--qa-keys"), i + 1 < args.count {
+            // QA: after showing, feed key events (e.g. "right,shift+down,return") through the panel.
+            let script = args[i + 1]
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in self?.sendQAKeys(script) }
+        }
         if args.contains("--show") {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.showCalendar() }
+        }
+    }
+
+    private func sendQAKeys(_ script: String) {
+        let codes: [String: (UInt16, String)] = [
+            "left": (123, "\u{F702}"), "right": (124, "\u{F703}"), "down": (125, "\u{F701}"), "up": (126, "\u{F700}"),
+            "return": (36, "\r"), "escape": (53, "\u{1b}"), "space": (49, " "), "comma": (43, ","),
+        ]
+        var delay = 0.0
+        for token in script.split(separator: ",") {
+            var parts = token.split(separator: "+").map(String.init)
+            let key = parts.removeLast()
+            var flags: NSEvent.ModifierFlags = []
+            if parts.contains("shift") { flags.insert(.shift) }
+            if parts.contains("cmd") { flags.insert(.command) }
+            let (code, chars) = codes[key] ?? (0, key)
+            DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                guard let self, let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                                                          windowNumber: self.window.windowNumber, context: nil, characters: chars,
+                                                          charactersIgnoringModifiers: flags.contains(.shift) ? chars.uppercased() : chars,
+                                                          isARepeat: false, keyCode: code) else { return }
+                log.notice("qa key \(String(token), privacy: .public)")
+                self.window.sendEvent(e)
+                log.notice("qa state month=\(self.month.description, privacy: .public) selected=\(self.selected.description, privacy: .public) visible=\(self.window.isVisible) editor=\(self.editor?.isShown == true) settings=\(self.settings?.window?.isVisible == true)")
+            }
+            delay += 0.4
         }
     }
 
@@ -497,7 +528,12 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
         editor = popover
         // Text fields need the app active to receive typing reliably.
         NSApp.activate()
-        popover.show(relativeTo: rect.insetBy(dx: -1, dy: -1), of: anchor, preferredEdge: .minX)
+        // Anchor at the window's left edge, level with the day or row, so the
+        // editor sits beside the calendar instead of covering it.
+        var r = content.convert(rect, from: anchor)
+        r.origin.x = 0
+        r.size.width = 1
+        popover.show(relativeTo: r, of: content, preferredEdge: .minX)
     }
 
     func popoverDidClose(_ notification: Notification) {
