@@ -13,6 +13,8 @@ final class PopoverWindow: NSPanel {
     let frameView = PopoverFrameView()
     /// Called for keys nothing else handled (the grid gets first chance).
     var onCancel: (() -> Void)?
+    /// A themed field editor for text fields in this panel.
+    var fieldEditorOverride: NSTextView?
 
     init() {
         super.init(contentRect: .zero, styleMask: [.nonactivatingPanel, .borderless], backing: .buffered, defer: true)
@@ -32,6 +34,11 @@ final class PopoverWindow: NSPanel {
     override var canBecomeMain: Bool { false }
 
     override func cancelOperation(_ sender: Any?) { onCancel?() }
+
+    override func fieldEditor(_ createFlag: Bool, for object: Any?) -> NSText? {
+        if let f = fieldEditorOverride, object is NSTextField { return f }
+        return super.fieldEditor(createFlag, for: object)
+    }
 
     /// Size of the content area (inside padding and arrow) for a window size.
     static func windowSize(forContent size: CGSize) -> CGSize {

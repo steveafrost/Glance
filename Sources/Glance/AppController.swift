@@ -6,7 +6,7 @@ private let log = Logger(subsystem: "com.steveafrost.Glance", category: "app")
 
 /// Wires the status item, calendar window, data model, timers and settings together.
 @MainActor
-final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
+final class AppController: NSObject, NSWindowDelegate {
     private let prefs = Preferences.shared
     private let model = CalendarModel()
     private let status = StatusItemController()
@@ -14,7 +14,9 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
     private let tooltip = TooltipPanel()
     private let content: CalendarContentView
     private var settings: SettingsWindowController?
-    private var editor: NSPopover?
+    private var editorPanel: PopoverWindow?
+    private var editorController: EventEditorController?
+    private var editorShown: Bool { editorPanel?.isVisible == true }
 
     private var month: MonthKey
     private var selected: DayKey
@@ -88,6 +90,7 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
         let codes: [String: (UInt16, String)] = [
             "left": (123, "\u{F702}"), "right": (124, "\u{F703}"), "down": (125, "\u{F701}"), "up": (126, "\u{F700}"),
             "return": (36, "\r"), "escape": (53, "\u{1b}"), "space": (49, " "), "comma": (43, ","),
+            "tab": (48, "\t"), "delete": (51, "\u{8}"),
         ]
         var delay = 0.0
         for token in script.split(separator: ",") {
@@ -96,6 +99,20 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
             var flags: NSEvent.ModifierFlags = []
             if parts.contains("shift") { flags.insert(.shift) }
             if parts.contains("cmd") { flags.insert(.command) }
+            if key == "edit-first" {
+                // Open the editor on the first timed agenda event (no changes are saved).
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    guard let self else { return }
+                    let first = self.content.agenda.rows.lazy.compactMap { row -> EventSnapshot? in
+                        if case .event(let e, _) = row, !e.isAllDay { return e }
+                        return nil
+                    }.first
+                    if let first { self.edit(first) }
+                    log.notice("qa edit-first \(first != nil)")
+                }
+                delay += 0.6
+                continue
+            }
             if key == "hover" {
                 // Hover today's cell as if the pointer were over it.
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
@@ -121,13 +138,16 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
             }
             let (code, chars) = codes[key] ?? (0, key)
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                guard let self, let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
-                                                          windowNumber: self.window.windowNumber, context: nil, characters: chars,
+                guard let self else { return }
+                // Keys go to the key window (the editor when it is open).
+                let target = NSApp.keyWindow ?? self.window
+                guard let e = NSEvent.keyEvent(with: .keyDown, location: .zero, modifierFlags: flags, timestamp: 0,
+                                                          windowNumber: target.windowNumber, context: nil, characters: chars,
                                                           charactersIgnoringModifiers: flags.contains(.shift) ? chars.uppercased() : chars,
                                                           isARepeat: false, keyCode: code) else { return }
                 log.notice("qa key \(String(token), privacy: .public)")
-                self.window.sendEvent(e)
-                log.notice("qa state month=\(self.month.description, privacy: .public) selected=\(self.selected.description, privacy: .public) visible=\(self.window.isVisible) editor=\(self.editor?.isShown == true) settings=\(self.settings?.window?.isVisible == true)")
+                target.sendEvent(e)
+                log.notice("qa state month=\(self.month.description, privacy: .public) selected=\(self.selected.description, privacy: .public) visible=\(self.window.isVisible) editor=\(self.editorShown) settings=\(self.settings?.window?.isVisible == true)")
             }
             delay += 0.4
         }
@@ -403,7 +423,7 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
 
     func hideCalendar() {
         log.notice("hide")
-        editor?.close()
+        closeEditor()
         tooltip.cancel()
         window.orderOut(nil)
         hiddenAt = Date()
@@ -445,7 +465,14 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
         // its own editor popover or an alert is in front.
         DispatchQueue.main.async { [weak self] in
             guard let self, self.window.isVisible, !self.keepOpenForQA else { return }
-            if self.editor?.isShown == true || NSApp.modalWindow != nil || NSApp.keyWindow === self.window { return }
+            if notification.object as? NSWindow === self.editorPanel {
+                // Clicking back into the calendar keeps the editor; anywhere else closes both.
+                if NSApp.modalWindow != nil || NSApp.keyWindow === self.window || NSApp.keyWindow === self.editorPanel { return }
+                self.hideCalendar()
+                return
+            }
+            if NSApp.modalWindow != nil || NSApp.keyWindow === self.window { return }
+            if self.editorShown, NSApp.keyWindow === self.editorPanel { return }
             self.hideCalendar()
         }
     }
@@ -492,7 +519,7 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
     }
 
     private func hover(_ day: DayKey?, rect: CGRect) {
-        guard let day, window.isVisible, editor?.isShown != true else { tooltip.cancel(); return }
+        guard let day, window.isVisible, !editorShown else { tooltip.cancel(); return }
         let events = model.events(on: day)
         let lines = events.map {
             TooltipView.Line(time: Agenda.timeText(for: $0, on: day, calendar: model.calendar, locale: .autoupdatingCurrent),
@@ -548,9 +575,11 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
     }
 
     private func presentEditor(_ draft: EventDraft, editable: Bool, anchor: NSView, rect: CGRect) {
-        editor?.close()
+        closeEditor()
         tooltip.cancel()
-        let vc = EventEditorController(draft: draft, calendars: model.calendarGroups, editable: editable, calendar: model.calendar)
+        let c = colors
+        let vc = EventEditorController(draft: draft, calendars: model.calendarGroups, editable: editable,
+                                       calendar: model.calendar, colors: c)
         let repo = model.repository
         let cal = model.calendar
         vc.save = { draft, future in try await repo.save(draft, futureEvents: future, calendar: cal) }
@@ -559,29 +588,51 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
             try await repo.delete(eventIdentifier: id, occurrenceStart: start, futureEvents: future)
         }
         vc.finish = { [weak self] result in
-            self?.editor?.close()
-            if result != .cancelled { self?.model.reloadNow() }
-            self?.window.makeKeyAndOrderFront(nil)
-            self?.window.makeFirstResponder(self?.content.grid)
+            guard let self else { return }
+            self.closeEditor()
+            if result != .cancelled { self.model.reloadNow() }
+            self.window.makeKeyAndOrderFront(nil)
+            self.window.makeFirstResponder(self.content.grid)
         }
-        let popover = NSPopover()
-        popover.contentViewController = vc
-        popover.behavior = .applicationDefined
-        popover.appearance = window.appearance
-        popover.delegate = self
-        editor = popover
+
+        // The same chrome as the calendar: theme fill, border, radius and shadow,
+        // with the arrow pointing back at the day or agenda row.
+        let panel = PopoverWindow()
+        panel.appearance = NSAppearance(named: c.isDark ? .darkAqua : .aqua)
+        panel.frameView.fillColor = c.background
+        panel.frameView.borderColor = c.divider
+        panel.fieldEditorOverride = themedFieldEditor(c)
+        panel.onCancel = { [weak vc] in vc?.cancelClicked() }
+        panel.delegate = self
+
+        let body = vc.view.fittingSize
+        let size = CGSize(width: ceil(body.width) + PopoverShape.arrowHeight, height: ceil(body.height))
+        let inWindow = content.convert(content.convert(rect, from: anchor), to: nil)
+        let anchorY = window.convertToScreen(inWindow).midY
+        let visible = window.screen?.visibleFrame ?? NSScreen.main?.visibleFrame ?? window.frame
+        let place = SidePlacement.place(size: size, anchorY: anchorY, calendarFrame: window.frame, visibleFrame: visible,
+                                        cornerRadius: PopoverWindow.cornerRadius)
+        panel.setFrame(place.frame, display: false)
+        panel.frameView.arrow = PopoverShape.Arrow(edge: place.arrowEdge, position: place.arrowPosition)
+        vc.view.frame = PopoverShape.bodyRect(in: panel.frameView.bounds, arrowEdge: place.arrowEdge)
+        panel.frameView.addSubview(vc.view)
+
+        editorPanel = panel
+        editorController = vc
         // Text fields need the app active to receive typing reliably.
         NSApp.activate()
-        // Anchor at the window's left edge, level with the day or row, so the
-        // editor sits beside the calendar instead of covering it.
-        var r = content.convert(rect, from: anchor)
-        r.origin.x = 0
-        r.size.width = 1
-        popover.show(relativeTo: r, of: content, preferredEdge: .minX)
+        panel.makeKeyAndOrderFront(nil)
+        vc.didPresent()
+        log.notice("editor frame=\(NSStringFromRect(place.frame), privacy: .public) edge=\(String(describing: place.arrowEdge), privacy: .public)")
     }
 
-    func popoverDidClose(_ notification: Notification) {
-        if (notification.object as? NSPopover) === editor { editor = nil }
+    private func closeEditor() {
+        guard let panel = editorPanel else { return }
+        editorController?.willClose()
+        panel.delegate = nil
+        panel.orderOut(nil)
+        editorPanel = nil
+        editorController = nil
     }
 
     private func confirmDelete(_ e: EventSnapshot) {
@@ -590,7 +641,7 @@ final class AppController: NSObject, NSWindowDelegate, NSPopoverDelegate {
             presentEditor(draft, editable: e.isEditable, anchor: content.agenda,
                           rect: agendaRowRect(content.agenda.rows.firstIndex { if case .event(let x, _) = $0 { x.id == e.id } else { false } }))
             // The editor owns the confirmation and span prompt.
-            (editor?.contentViewController as? EventEditorController)?.deleteClicked()
+            self.editorController?.deleteClicked()
         }
     }
 
