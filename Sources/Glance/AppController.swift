@@ -39,7 +39,7 @@ final class AppController: NSObject, NSWindowDelegate {
         let grid = MonthGridView(model: .init(grid: MonthGrid(month: t.monthKey, firstWeekday: Preferences.shared.firstWeekday),
                                               selected: t, today: t, highlighted: Preferences.shared.highlightedWeekdays,
                                               dots: [:], geometry: GridGeometry(showsWeekNumbers: Preferences.shared.showWeekNumbers,
-                                                                    rows: MonthGrid.rows)))
+                                                                    rows: MonthGrid(month: t.monthKey, firstWeekday: Preferences.shared.firstWeekday).visibleRows)))
         content = CalendarContentView(grid: grid)
         super.init()
     }
@@ -363,8 +363,9 @@ final class AppController: NSObject, NSWindowDelegate {
                 dots[day] = colors
             }
         }
-        // Always 6 rows, so the window height doesn't change between months.
-        let geometry = GridGeometry(showsWeekNumbers: prefs.showWeekNumbers, rows: MonthGrid.rows)
+        // Only the month's own weeks; the agenda takes the rest (AgendaSizing).
+        let geometry = GridGeometry(showsWeekNumbers: prefs.showWeekNumbers, rows: grid.visibleRows)
+        let rowsChanged = geometry.rows != content.grid.model.geometry.rows
         content.grid.model = .init(grid: grid, selected: selected, today: today,
                                    highlighted: prefs.highlightedWeekdays, dots: dots, geometry: geometry)
 
@@ -394,6 +395,8 @@ final class AppController: NSObject, NSWindowDelegate {
         content.agenda.setRows(Agenda.rows(eventsByDay: byDay, start: selected, days: prefs.agendaDays,
                                            showEmptyDays: prefs.showEmptyAgendaDays))
         updateMeetingState()
+        // The grid moves the agenda even when the window size doesn't change.
+        if rowsChanged { content.needsLayout = true }
         if window.isVisible { positionWindow(initial: false) }
     }
 
@@ -441,7 +444,12 @@ final class AppController: NSObject, NSWindowDelegate {
 
     private func positionWindow(initial: Bool) {
         let width = content.preferredWidth
-        let wanted = CGSize(width: width, height: content.fixedHeight + min(max(content.agenda.contentHeight, AgendaView.emptyRowHeight), AgendaView.maxHeight))
+        let geometry = content.grid.model.geometry
+        func agendaHeight(screenRoom: CGFloat?) -> CGFloat {
+            AgendaSizing.height(content: content.agenda.contentHeight, minimum: AgendaView.emptyRowHeight,
+                                geometry: geometry, screenRoom: screenRoom)
+        }
+        let wanted = CGSize(width: width, height: content.fixedHeight + agendaHeight(screenRoom: nil))
         let mainIndex = NSScreen.screens.firstIndex { $0 == NSScreen.main } ?? 0
         let input = PopoverPlacement.Input(
             itemFrame: status.screenFrame, itemVisible: status.isVisible, screens: screens, mainScreenIndex: mainIndex,
@@ -453,13 +461,16 @@ final class AppController: NSObject, NSWindowDelegate {
 
         // Fit the agenda into whatever height the screen allows.
         let chrome = PopoverWindow.windowSize(forContent: .zero).height
-        // Keep the window compact; the agenda scrolls beyond this.
-        let maxAgenda = min(AgendaView.maxHeight, max(60, result.maxHeight - chrome - content.fixedHeight))
-        content.agendaHeight = min(max(content.agenda.contentHeight, AgendaView.emptyRowHeight), maxAgenda)
+        // Keep the window compact; the agenda scrolls beyond this. A shorter
+        // grid gives its rows to the agenda, so a full window is the same
+        // height every month.
+        content.agendaHeight = agendaHeight(screenRoom: result.maxHeight - chrome - content.fixedHeight)
         let size = PopoverWindow.windowSize(forContent: CGSize(width: width, height: content.preferredHeight))
         let top = result.origin.y + input.windowSize.height
         let frame = CGRect(x: result.origin.x, y: top - min(size.height, result.maxHeight), width: size.width,
                            height: min(size.height, result.maxHeight))
+        // Instant (no animation); the top edge and caret stay put when the
+        // height changes with the month or the agenda.
         window.setFrame(frame, display: true)
         window.frameView.arrowX = result.arrowX
         content.frame = window.contentRect

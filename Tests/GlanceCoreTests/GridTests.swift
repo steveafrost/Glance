@@ -29,66 +29,77 @@ final class GridGeometryTests: XCTestCase {
     }
 }
 
-final class FixedGridHeightTests: XCTestCase {
-    /// The geometry the app builds for a month (always 6 rows).
-    private func appGeometry(weekNumbers: Bool) -> GridGeometry {
-        GridGeometry(showsWeekNumbers: weekNumbers, rows: MonthGrid.rows)
+final class AgendaSizingTests: XCTestCase {
+    private func grid(_ m: Int, _ fw: Int) -> MonthGrid { MonthGrid(month: MonthKey(year: 2026, month: m), firstWeekday: fw) }
+    /// The geometry the app builds for a month: only its own weeks.
+    private func geometry(_ g: MonthGrid, weekNumbers: Bool) -> GridGeometry {
+        GridGeometry(showsWeekNumbers: weekNumbers, rows: g.visibleRows)
     }
 
-    func testSizeIsTheSameForFourFiveAndSixWeekMonths() {
-        // Feb 2026 covers 4 weeks, Nov 2026 5 and Aug 2026 6 with a Sunday
-        // start (5, 6 and 6 with Monday). The geometry doesn't depend on the
-        // month, and every month's days fit inside it.
-        for weekNumbers in [false, true] {
-            let g = appGeometry(weekNumbers: weekNumbers)
-            XCTAssertEqual(g.rows, 6)
-            XCTAssertEqual(g.size, CGSize(width: weekNumbers ? 255 : 231, height: 194))
-            for fw in [1, 2] {
-                for m in [2, 11, 8] {
-                    let grid = MonthGrid(month: MonthKey(year: 2026, month: m), firstWeekday: fw)
-                    for i in 0..<42 where grid.isInMonth(index: i) {
-                        XCTAssertTrue(CGRect(origin: .zero, size: g.size).contains(g.cellRect(index: i)), "2026-\(m) fw\(fw) #\(i)")
-                    }
-                }
+    func testGridPlusFullAgendaIsTheSameEveryMonth() {
+        // Feb 2026 covers 4 weeks, Nov 5 and Aug 6 with a Sunday start
+        // (5, 6 and 6 with Monday).
+        let full6 = GridGeometry(rows: 6)
+        let total = full6.size.height + AgendaSizing.baseMaxHeight // 194 + 420
+        XCTAssertEqual(total, 614)
+        for (m, fw, rows) in [(2, 1, 4), (11, 1, 5), (8, 1, 6), (2, 2, 5), (11, 2, 6), (8, 2, 6)] {
+            for weekNumbers in [false, true] {
+                let g = geometry(grid(m, fw), weekNumbers: weekNumbers)
+                XCTAssertEqual(g.rows, rows, "2026-\(m) fw\(fw)")
+                XCTAssertEqual(g.size.height, g.headerHeight + CGFloat(rows) * g.cellHeight)
+                XCTAssertEqual(g.size.height + AgendaSizing.maxHeight(for: g), total, "2026-\(m) fw\(fw) wk\(weekNumbers)")
+                // A long agenda fills exactly that.
+                let agenda = AgendaSizing.height(content: 2000, minimum: 26, geometry: g)
+                XCTAssertEqual(g.size.height + agenda, total)
             }
         }
+        XCTAssertEqual(AgendaSizing.maxHeight(for: geometry(grid(2, 1), weekNumbers: false)), 420 + 2 * 29)
     }
 
-    func testColumnShadingSpansAllSixRows() {
-        let g = appGeometry(weekNumbers: true)
+    func testShortAgendaKeepsItsOwnHeight() {
+        let g = geometry(grid(2, 1), weekNumbers: false)
+        XCTAssertEqual(AgendaSizing.height(content: 100, minimum: 26, geometry: g), 100)
+        XCTAssertEqual(AgendaSizing.height(content: 0, minimum: 26, geometry: g), 26, "empty agenda still shows a row")
+    }
+
+    func testScreenClampWinsWhenSmaller() {
+        for m in [2, 11, 8] {
+            let g = geometry(grid(m, 1), weekNumbers: true)
+            XCTAssertEqual(AgendaSizing.height(content: 2000, minimum: 26, geometry: g, screenRoom: 300), 300)
+            XCTAssertEqual(AgendaSizing.height(content: 2000, minimum: 26, geometry: g, screenRoom: 10),
+                           AgendaSizing.minimumScreenRoom, "never squeezed below the floor")
+            // Plenty of room: the month's own maximum applies.
+            XCTAssertEqual(AgendaSizing.height(content: 2000, minimum: 26, geometry: g, screenRoom: 5000),
+                           AgendaSizing.maxHeight(for: g))
+            // Short content under a roomy screen is unaffected.
+            XCTAssertEqual(AgendaSizing.height(content: 100, minimum: 26, geometry: g, screenRoom: 300), 100)
+        }
+    }
+
+    func testColumnShadingCoversOnlyTheMonthsRows() {
+        let feb = geometry(grid(2, 1), weekNumbers: true)
         for col in 0..<7 {
-            XCTAssertEqual(g.columnRect(column: col).height, g.size.height)
-            XCTAssertEqual(g.columnRect(column: col).maxY, g.cellRect(index: 35 + col).maxY)
+            XCTAssertEqual(feb.columnRect(column: col).maxY, feb.cellRect(index: 21 + col).maxY)
+            XCTAssertEqual(feb.columnRect(column: col).height, feb.size.height)
         }
-    }
-
-    func testEmptyTrailingRowHitTestsToBlankCells() {
-        // Feb 2026 (Sunday start): rows 5 and 6 are laid out but hold no days.
-        let grid = MonthGrid(month: MonthKey(year: 2026, month: 2), firstWeekday: 1)
-        let g = appGeometry(weekNumbers: false)
-        for i in 28..<42 {
-            let r = g.cellRect(index: i)
-            XCTAssertEqual(g.index(at: CGPoint(x: r.midX, y: r.midY)), i)
-            XCTAssertNil(grid.visibleDay(at: i))
-        }
+        // A cell below the month's last week isn't hit-testable.
+        let r = feb.cellRect(index: 28)
+        XCTAssertNil(feb.index(at: CGPoint(x: r.midX, y: r.midY)))
     }
 
     func testKeyboardMovesNeverLandOnABlankCell() {
         // The selection is always a day of the shown month (the month follows
-        // the selection), so it always maps to an in-month cell.
+        // the selection), so it maps to a drawn cell inside the shown rows.
         for fw in [1, 2] {
             var day = DayKey(year: 2025, month: 12, day: 1)
             for _ in 0..<500 {
-                for n in [1, -1, 7, -7] {
-                    let next = day.adding(days: n)
+                let targets = [1, -1, 7, -7].map { day.adding(days: $0) }
+                    + [1, -1, 12, -12].map { GridNavigation.day(day, movedByMonths: $0) }
+                for next in targets {
                     let g = MonthGrid(month: next.monthKey, firstWeekday: fw)
                     let i = try! XCTUnwrap(g.index(of: next))
                     XCTAssertTrue(g.isInMonth(index: i))
-                }
-                for n in [1, -1, 12, -12] {
-                    let next = GridNavigation.day(day, movedByMonths: n)
-                    let g = MonthGrid(month: next.monthKey, firstWeekday: fw)
-                    XCTAssertTrue(g.isInMonth(index: try! XCTUnwrap(g.index(of: next))))
+                    XCTAssertLessThan(i / 7, g.visibleRows)
                 }
                 day = day.adding(days: 1)
             }

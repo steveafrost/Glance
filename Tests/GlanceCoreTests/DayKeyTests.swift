@@ -162,6 +162,7 @@ final class MonthGridTests: XCTestCase {
                     let g = grid(y, m, fw)
                     let n = dayRows(g)
                     XCTAssertTrue((4...6).contains(n))
+                    XCTAssertEqual(g.visibleRows, n)
                     // Days fill the first n rows; any later rows are wholly empty.
                     for row in 0..<MonthGrid.rows { XCTAssertEqual(g.rowHasDays(row), row < n, "\(y)-\(m) fw\(fw) row \(row)") }
                     for i in 0..<42 { XCTAssertEqual(g.isInMonth(index: i), g.isInMonth(g.days[i])) }

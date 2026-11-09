@@ -19,7 +19,6 @@ final class AgendaView: NSScrollView, NSTableViewDataSource, NSTableViewDelegate
     static let dayRowHeight: CGFloat = 24
     static let eventRowHeight: CGFloat = 38
     static let emptyRowHeight: CGFloat = 26
-    static let maxHeight: CGFloat = 420
 
     init() {
         super.init(frame: .zero)

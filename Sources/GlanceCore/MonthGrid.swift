@@ -1,9 +1,10 @@
 import Foundation
 
 /// The weeks of one month. `days` always holds 6 full rows of 7 (the
-/// range events are fetched for), and the grid always lays out all 6 rows
-/// so its height never changes between months. Only in-month cells are
-/// drawn: out-of-month slots, and any trailing all-out-of-month rows, stay empty.
+/// range events are fetched for), but only `visibleRows` rows are shown,
+/// and only in-month cells are drawn: out-of-month slots stay empty. The
+/// agenda takes the height of the rows a shorter month doesn't show
+/// (`AgendaSizing`).
 public struct MonthGrid: Sendable, Equatable {
     /// The most rows a month can need.
     public static let rows = 6
@@ -51,17 +52,19 @@ public struct MonthGrid: Sendable, Equatable {
 
     public func column(forWeekday weekday: Int) -> Int { (weekday - firstWeekday + 7) % 7 }
 
-    /// Whether row `row` holds at least one day of this month.
+    /// Rows the month covers: 4 to 6, depending on its length and first weekday.
+    public var visibleRows: Int { (leadingBlanks + month.numberOfDays + Self.columns - 1) / Self.columns }
+
+    /// Whether row `row` holds at least one day of this month (true exactly
+    /// for rows below `visibleRows`).
     public func rowHasDays(_ row: Int) -> Bool {
         (0..<Self.columns).contains { isInMonth(index: row * Self.columns + $0) }
     }
 
-    /// Week numbers for the rows that hold days of this month (always the
-    /// first 4 to 6 rows); trailing empty rows get none. Monday-start grids
-    /// use ISO 8601 numbering; other starts count the week containing
-    /// 1 January as week 1.
+    /// Week numbers for each visible row. Monday-start grids use ISO 8601
+    /// numbering; other starts count the week containing 1 January as week 1.
     public func weekNumbers() -> [Int] {
-        (0..<Self.rows).filter(rowHasDays).map { WeekNumber.of(days[$0 * Self.columns], firstWeekday: firstWeekday) }
+        (0..<visibleRows).map { WeekNumber.of(days[$0 * Self.columns], firstWeekday: firstWeekday) }
     }
 }
 
