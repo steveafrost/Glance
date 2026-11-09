@@ -11,7 +11,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private let prefs = Preferences.shared
     private let formatter = DateFormatter()
     private(set) var clock = ClockFormat("")
-    private var clockWidth: CGFloat = 0
+    /// The widest clock string over the year (so the item's width never changes).
+    private var widestClock = ""
+    private var lengthCache: (key: String, length: CGFloat)?
     private var meetingActive = false
     private var lastPlacement: IconLayout.Placement?
     private var observers: [any NSObjectProtocol] = []
@@ -49,7 +51,8 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         formatter.calendar = .autoupdatingCurrent
         formatter.timeZone = .autoupdatingCurrent
         formatter.dateFormat = clock.isEmpty ? "" : clock.pattern
-        clockWidth = clock.isEmpty ? 0 : measureClockWidth()
+        widestClock = clock.isEmpty ? "" : findWidestClock()
+        lengthCache = nil
         update()
     }
 
@@ -78,11 +81,13 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         var title = ""
         if !clock.isEmpty {
             title = formatter.string(from: now)
-            button.attributedTitle = NSAttributedString(string: title, attributes: [.font: clockFont])
+            // A space separates the clock from the icon.
+            let prefix = button.image == nil ? "" : " "
             button.imagePosition = button.image == nil ? .noImage : .imageLeading
             button.imageHugsTitle = true
             // A fixed length keeps the item (and everything to its left) from jittering.
-            item.length = fixedLength(imageWidth: button.image?.size.width ?? 0)
+            item.length = fixedLength(for: button, title: prefix + widestClock)
+            button.attributedTitle = NSAttributedString(string: prefix + title, attributes: [.font: clockFont])
         } else {
             button.title = ""
             button.imagePosition = .imageOnly
@@ -106,18 +111,21 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         NSFont.monospacedDigitSystemFont(ofSize: NSFont.systemFontSize, weight: .regular)
     }
 
-    private func measureClockWidth() -> CGFloat {
+    private func findWidestClock() -> String {
         let attrs: [NSAttributedString.Key: Any] = [.font: clockFont]
-        let widest = ClockFormat.sampleDates(calendar: .autoupdatingCurrent).map {
-            (formatter.string(from: $0) as NSString).size(withAttributes: attrs).width
-        }.max() ?? 0
-        return widest.rounded(.up)
+        return ClockFormat.sampleDates(calendar: .autoupdatingCurrent)
+            .map { formatter.string(from: $0) }
+            .max { ($0 as NSString).size(withAttributes: attrs).width < ($1 as NSString).size(withAttributes: attrs).width } ?? ""
     }
 
-    private func fixedLength(imageWidth: CGFloat) -> CGFloat {
-        // Status bar button insets: ~5pt each side, 4pt between image and title.
-        let gap: CGFloat = imageWidth > 0 ? 4 : 0
-        return (10 + imageWidth + gap + clockWidth).rounded(.up)
+    /// The button's fitting width with the widest title, measured once per icon/format.
+    private func fixedLength(for button: NSStatusBarButton, title widest: String) -> CGFloat {
+        let key = "\(widest)|\(button.image?.size.width ?? 0)"
+        if let c = lengthCache, c.key == key { return c.length }
+        button.attributedTitle = NSAttributedString(string: widest, attributes: [.font: clockFont])
+        let length = button.fittingSize.width.rounded(.up)
+        lengthCache = (key, length)
+        return length
     }
 
     // MARK: Geometry
