@@ -427,42 +427,146 @@ private struct ClockRows: View {
 
 private struct AppearanceSettings: View {
     @ObservedObject var state: SettingsState
+    @Environment(\.palette) private var p
     private let weekdays = Calendar.autoupdatingCurrent.weekdaySymbols
+    private let shortWeekdays = Calendar.autoupdatingCurrent.shortWeekdaySymbols
+    private var prefs: Preferences { .shared }
+
+    private var mode: SettingsModel.ThemeMode { .init(prefs.theme) }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Picker("Theme", selection: state.binding(\.theme)) {
-                ForEach(ThemeChoice.allCases, id: \.self) { Text($0.displayName).tag($0) }
-            }
-            Picker("Week starts on", selection: state.binding(\.firstWeekdaySetting)) {
-                Text("System (\(weekdays[Calendar.autoupdatingCurrent.firstWeekday - 1]))").tag(0)
-                ForEach(1...7, id: \.self) { Text(weekdays[$0 - 1]).tag($0) }
-            }
-            Toggle("Show week numbers", isOn: state.binding(\.showWeekNumbers))
-            Toggle("Show event dots", isOn: state.binding(\.showEventDots))
-            LabeledContent("Highlight") {
-                HStack(spacing: 4) {
-                    ForEach(orderedWeekdays, id: \.self) { wd in
-                        Toggle(String(weekdays[wd - 1].prefix(3)), isOn: Binding(
-                            get: { Preferences.shared.highlightedWeekdays.contains(weekday: wd) },
-                            set: { on in
-                                var s = Preferences.shared.highlightedWeekdays
-                                if on { s.insert(WeekdaySet(weekdays: [wd])) } else { s.remove(WeekdaySet(weekdays: [wd])) }
-                                Preferences.shared.highlightedWeekdays = s
-                                state.objectWillChange.send()
-                            }))
-                        .toggleStyle(.button)
-                        .controlSize(.small)
+        VStack(alignment: .leading, spacing: 18) {
+            SettingsSection(title: "Theme") {
+                HStack(spacing: 10) {
+                    ForEach(CatppuccinFlavor.allCases, id: \.self) { flavor in
+                        FlavorSwatch(flavor: flavor, ringed: mode.ringedFlavor(isDarkMode: isDarkMode) == flavor,
+                                     dimmed: mode == .systemColors) {
+                            setTheme(SettingsModel.ThemeMode.flavor(flavor).choice)
+                        }
                     }
+                }
+                .padding(12)
+                SettingsRow(label: "Match macOS appearance", caption: "Latte in Light mode, Mocha in Dark mode") {
+                    ThemedSwitch(isOn: Binding(get: { mode == .matchSystem },
+                                               set: { setTheme($0 ? .catppuccinAuto : flavorChoice) }))
+                }
+                SettingsRow(label: "Use system colours", caption: "Native macOS colours instead of Catppuccin") {
+                    ThemedSwitch(isOn: Binding(get: { mode == .systemColors },
+                                               set: { setTheme($0 ? .system : flavorChoice) }))
+                }
+            }
+
+            SettingsSection(title: "Calendar") {
+                SettingsRow(label: "Week starts on") {
+                    ThemedMenuPicker(selection: state.binding(\.firstWeekdaySetting),
+                                     options: [(0, "System (\(weekdays[Calendar.autoupdatingCurrent.firstWeekday - 1]))")]
+                                         + (1...7).map { ($0, weekdays[$0 - 1]) },
+                                     width: 160)
+                }
+                SettingsRow(label: "Highlighted days", caption: "Shaded columns in the grid") {
+                    HStack(spacing: 4) {
+                        ForEach(SettingsModel.orderedWeekdays(firstWeekday: prefs.firstWeekday), id: \.self) { wd in
+                            DayChip(title: shortWeekdays[wd - 1], isOn: highlighted(wd))
+                        }
+                    }
+                }
+                SettingsRow(label: "Show week numbers") { ThemedSwitch(isOn: state.binding(\.showWeekNumbers)) }
+                SettingsRow(label: "Show event dots", caption: "Coloured dots under days with events") {
+                    ThemedSwitch(isOn: state.binding(\.showEventDots))
                 }
             }
         }
-
     }
 
-    private var orderedWeekdays: [Int] {
-        let first = Preferences.shared.firstWeekday
-        return (0..<7).map { (first - 1 + $0) % 7 + 1 }
+    private var isDarkMode: Bool { NSApp.effectiveAppearance.bestMatch(from: [.aqua, .darkAqua]) == .darkAqua }
+
+    /// Turning a mode off lands on the flavour that's showing now.
+    private var flavorChoice: ThemeChoice {
+        SettingsModel.ThemeMode.flavor(mode.ringedFlavor(isDarkMode: isDarkMode) ?? (isDarkMode ? .mocha : .latte)).choice
+    }
+
+    private func setTheme(_ choice: ThemeChoice) {
+        prefs.theme = choice
+        state.objectWillChange.send()
+    }
+
+    private func highlighted(_ wd: Int) -> Binding<Bool> {
+        Binding(get: { prefs.highlightedWeekdays.contains(weekday: wd) },
+                set: { on in
+                    var s = prefs.highlightedWeekdays
+                    if on { s.insert(WeekdaySet(weekdays: [wd])) } else { s.remove(WeekdaySet(weekdays: [wd])) }
+                    prefs.highlightedWeekdays = s
+                    state.objectWillChange.send()
+                })
+    }
+}
+
+/// A flavour card: a miniature of the calendar in that flavour's colours,
+/// ringed in the accent colour when selected.
+private struct FlavorSwatch: View {
+    let flavor: CatppuccinFlavor
+    let ringed: Bool
+    let dimmed: Bool
+    let action: () -> Void
+    @Environment(\.palette) private var p
+
+    private func col(_ hex: UInt32) -> Color { Color(nsColor: NSColor(rgba: RGBA(hex: hex))) }
+
+    var body: some View {
+        let c = flavor.colors
+        Button(action: action) {
+            VStack(spacing: 7) {
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack(spacing: 4) {
+                        ForEach([c.mauve, c.blue, c.green, c.peach, c.red], id: \.self) { hex in
+                            Circle().fill(col(hex)).frame(width: 9, height: 9)
+                        }
+                    }
+                    RoundedRectangle(cornerRadius: 2).fill(col(c.text)).frame(width: 54, height: 5)
+                    RoundedRectangle(cornerRadius: 2).fill(col(c.subtext0)).frame(width: 38, height: 5)
+                    HStack(spacing: 3) {
+                        ForEach(0..<5, id: \.self) { i in
+                            RoundedRectangle(cornerRadius: 2).fill(i == 2 ? col(c.mauve) : col(c.surface0))
+                                .frame(width: 11, height: 9)
+                        }
+                    }
+                }
+                .padding(10)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(col(c.base)))
+                .overlay(RoundedRectangle(cornerRadius: 8, style: .continuous).strokeBorder(col(c.surface0), lineWidth: 1))
+                .padding(3)
+                .overlay(RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .strokeBorder(ringed ? p.accent : .clear, lineWidth: 2))
+                Text(flavor.displayName).font(.system(size: 12, weight: ringed ? .semibold : .regular))
+                    .foregroundStyle(ringed ? p.text : p.subtext0)
+            }
+            .opacity(dimmed ? 0.5 : 1)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text("Catppuccin \(flavor.displayName)"))
+        .accessibilityAddTraits(ringed ? .isSelected : [])
+    }
+}
+
+/// A toggleable weekday chip: accent when on, surface0 when off.
+private struct DayChip: View {
+    let title: String
+    @Binding var isOn: Bool
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        Button { isOn.toggle() } label: {
+            Text(title).font(.system(size: 11, weight: isOn ? .semibold : .regular))
+                .foregroundStyle(isOn ? p.onAccent : p.subtext0)
+                .frame(width: 34, height: 24)
+                .background(RoundedRectangle(cornerRadius: 6, style: .continuous).fill(isOn ? p.accent : p.surface0))
+                .overlay(RoundedRectangle(cornerRadius: 6, style: .continuous).strokeBorder(isOn ? .clear : p.surface1, lineWidth: 1))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(Text(title))
+        .accessibilityAddTraits(isOn ? .isSelected : [])
     }
 }
 
