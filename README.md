@@ -26,7 +26,6 @@ third-party dependencies. Requires macOS 27.
   prompt for repeating events). Declined events are hidden.
 - **Calendars**: choose which appear, grouped by account.
 - **Week numbers**, highlighted weekdays and first day of week.
-- **Tooltips** listing a day's events when hovering over the grid.
 - **Global hotkey** (Carbon, recorded in Settings) and **Open at login**.
 
 ## Navigating the calendar
@@ -72,7 +71,7 @@ with the calendars entitlement and the hardened runtime.
 at launch, `--keep-open` stops it hiding on focus loss, `--print-geometry`
 logs the status button geometry (`log show --predicate 'subsystem ==
 "com.steveafrost.Glance"'`), `--reference-symbol` adds an SF Symbol item for
-alignment checks, `--qa-keys "right,shift+down,return,swipe-left,hover"`
+alignment checks, `--qa-keys "right,shift+down,return,swipe-left"`
 feeds input through the real handlers. Any preference can be overridden for
 one run, e.g. `-theme mocha -clockFormat "EEE h:mm a"`.
 

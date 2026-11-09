@@ -11,7 +11,6 @@ final class AppController: NSObject, NSWindowDelegate {
     private let model = CalendarModel()
     private let status = StatusItemController()
     private let window = PopoverWindow()
-    private let tooltip = TooltipPanel()
     private let content: CalendarContentView
     private var settings: SettingsWindowController?
     private var editorPanel: PopoverWindow?
@@ -123,17 +122,6 @@ final class AppController: NSObject, NSWindowDelegate {
                 delay += 0.6
                 continue
             }
-            if key == "hover" {
-                // Hover today's cell as if the pointer were over it.
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                    guard let self else { return }
-                    let rect = self.content.grid.convert(self.cellRect(for: self.today), to: nil)
-                    self.content.grid.onHover?(self.today, rect)
-                    log.notice("qa hover \(self.today.description, privacy: .public)")
-                }
-                delay += 0.4
-                continue
-            }
             if key.hasPrefix("swipe") {
                 // "swipe-left" / "swipe-right": a phased trackpad gesture plus momentum, fingers moving that way.
                 let fingersLeft = key == "swipe-left"
@@ -197,7 +185,6 @@ final class AppController: NSObject, NSWindowDelegate {
         grid.onSelect = { [weak self] day in self?.select(day) }
         grid.onDoubleClick = { [weak self] day in self?.select(day); self?.newEvent(on: day) }
         grid.onCommand = { [weak self] cmd in self?.perform(cmd) }
-        grid.onHover = { [weak self] day, rect in self?.hover(day, rect: rect) }
 
         content.addButton.target = self
         content.addButton.action = #selector(addEvent)
@@ -324,7 +311,6 @@ final class AppController: NSObject, NSWindowDelegate {
     private func applyTheme() {
         let appearance = ThemeColors.forcedAppearance
         window.appearance = appearance
-        tooltip.appearance = appearance
         let effective = appearance ?? NSApp.effectiveAppearance
         var colors: ThemeColors!
         withAppearance(effective) { colors = ThemeColors.current(for: effective) }
@@ -436,7 +422,6 @@ final class AppController: NSObject, NSWindowDelegate {
     func hideCalendar() {
         log.notice("hide")
         closeEditor()
-        tooltip.cancel()
         window.orderOut(nil)
         hiddenAt = Date()
     }
@@ -530,20 +515,6 @@ final class AppController: NSObject, NSWindowDelegate {
         menu.popUp(positioning: nil, at: CGPoint(x: 0, y: sender.bounds.maxY + 4), in: sender)
     }
 
-    private func hover(_ day: DayKey?, rect: CGRect) {
-        guard let day, window.isVisible, !editorShown else { tooltip.cancel(); return }
-        let events = model.events(on: day)
-        let lines = events.map {
-            TooltipView.Line(time: Agenda.timeText(for: $0, on: day, calendar: model.calendar, locale: .autoupdatingCurrent),
-                             title: $0.title, color: NSColor(rgba: $0.color))
-        }
-        let f = DateFormatter()
-        f.setLocalizedDateFormatFromTemplate("EEEEMMMMd")
-        let screenRect = window.convertToScreen(rect)
-        tooltip.schedule(lines: lines, title: f.string(from: day.startDate(in: model.calendar)), near: screenRect,
-                         appearance: window.appearance, colors: colors)
-    }
-
     // MARK: Events
 
     private func newEvent(on day: DayKey) {
@@ -588,7 +559,6 @@ final class AppController: NSObject, NSWindowDelegate {
 
     private func presentEditor(_ draft: EventDraft, editable: Bool, anchor: NSView, rect: CGRect) {
         closeEditor()
-        tooltip.cancel()
         let c = colors
         let vc = EventEditorController(draft: draft, calendars: model.calendarGroups, editable: editable,
                                        calendar: model.calendar, colors: c)

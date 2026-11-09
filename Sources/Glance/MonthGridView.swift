@@ -22,7 +22,6 @@ final class MonthGridView: NSView {
 
     var onSelect: ((DayKey) -> Void)?
     var onDoubleClick: ((DayKey) -> Void)?
-    var onHover: ((DayKey?, CGRect) -> Void)?
     var onCommand: ((GridCommand) -> Void)?
     private var swipe = SwipeTracker()
 
@@ -143,21 +142,12 @@ final class MonthGridView: NSView {
     override func mouseMoved(with event: NSEvent) { updateHover(event) }
     override func mouseEntered(with event: NSEvent) { updateHover(event) }
 
-    override func mouseExited(with event: NSEvent) {
-        hovered = nil
-        onHover?(nil, .zero)
-    }
+    override func mouseExited(with event: NSEvent) { hovered = nil }
 
     private func updateHover(_ event: NSEvent) {
         let p = convert(event.locationInWindow, from: nil)
         let i = model.geometry.index(at: p).flatMap { model.grid.isInMonth(index: $0) ? $0 : nil }
-        guard i != hovered else { return }
-        hovered = i
-        if let i {
-            onHover?(model.grid.days[i], convert(model.geometry.cellRect(index: i), to: nil))
-        } else {
-            onHover?(nil, .zero)
-        }
+        if i != hovered { hovered = i }
     }
 
     override func mouseDown(with event: NSEvent) {
