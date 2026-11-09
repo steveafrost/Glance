@@ -19,12 +19,12 @@ final class MeetingLinkTests: XCTestCase {
         Hi team,
         ──────────
         Join Zoom Meeting
-        https://shopify.zoom.us/j/99999999999?pwd=xyz (passcode 1234).
+        https://example.zoom.us/j/99999999999?pwd=xyz (passcode 1234).
         Dial in: +1 555 0100
         """
         let link = MeetingLinkParser.firstLink(in: notes)
         XCTAssertEqual(link?.provider, .zoom)
-        XCTAssertEqual(link?.url.absoluteString, "https://shopify.zoom.us/j/99999999999?pwd=xyz")
+        XCTAssertEqual(link?.url.absoluteString, "https://example.zoom.us/j/99999999999?pwd=xyz")
     }
 
     func testAngleBracketedOutlookLink() {

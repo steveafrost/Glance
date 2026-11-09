@@ -25,11 +25,13 @@ build() {
   [[ ! -e $DIST ]] || die "$DIST exists; remove it to rebuild"
   GLANCE_VERSION=$VERSION script/build-app.sh --release
   script/check-offline.sh build/Glance.app
-  local team
-  team=$(codesign -dv build/Glance.app 2>&1 | sed -n 's/^TeamIdentifier=//p')
+  local info team
+  info=$(codesign -d --verbose=4 build/Glance.app 2>&1)
+  team=$(sed -n 's/^TeamIdentifier=//p' <<<"$info")
   [[ -n $team && $team != "not set" ]] || die "build/Glance.app has no team identifier"
-  codesign -dv build/Glance.app 2>&1 | grep -q "Authority=Developer ID Application" || die "not signed with Developer ID"
-  codesign -d --verbose=4 build/Glance.app 2>&1 | grep -q "Timestamp=" || die "no secure timestamp"
+  [[ $info == *"Authority=Developer ID Application"* ]] || die "not signed with Developer ID"
+  [[ $info == *"Timestamp="* ]] || die "no secure timestamp"
+  [[ $info == *"runtime"* ]] || die "hardened runtime is off"
 
   mkdir -p "$DIST"
   ditto build/Glance.app "$DIST/Glance.app"

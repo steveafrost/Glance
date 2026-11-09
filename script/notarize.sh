@@ -43,8 +43,9 @@ xcrun notarytool log "$ID" --keychain-profile "$PROFILE" notary-log.json >/dev/n
 
 xcrun stapler staple "$APP"
 xcrun stapler validate "$APP"
-spctl --assess --type execute -vv "$APP" 2>&1 | tee /dev/stderr | grep -q "source=Notarized Developer ID" \
-  || die "Gatekeeper doesn't see $APP as notarized"
+ASSESS=$(spctl --assess --type execute -vv "$APP" 2>&1) || true
+echo "$ASSESS"
+[[ $ASSESS == *"source=Notarized Developer ID"* ]] || die "Gatekeeper doesn't see $APP as notarized"
 
 # The stapled app is what ships: zip it again.
 rm -f "$ZIP"
