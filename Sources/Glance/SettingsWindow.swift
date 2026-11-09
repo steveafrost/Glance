@@ -93,8 +93,8 @@ struct SettingsView: View {
             AppearanceSettings(state: state).tabItem { Label("Appearance", systemImage: "paintpalette") }
             CalendarSettings(state: state).tabItem { Label("Calendars", systemImage: "calendar") }
         }
-        .frame(width: 460)
-        .padding(.vertical, 8)
+        // Grouped forms in a TabView have no intrinsic height; size explicitly.
+        .frame(width: 500, height: 560)
     }
 }
 
@@ -242,7 +242,6 @@ private struct CalendarSettings: View {
             }
         }
         .formStyle(.grouped)
-        .frame(minHeight: 300, maxHeight: 520)
     }
 }
 
