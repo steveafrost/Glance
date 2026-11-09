@@ -131,6 +131,11 @@ public enum MeetingSchedule {
         public var activeEventID: String?
         /// When `activeEventID` may next change; nil if nothing is coming up.
         public var nextChange: Date?
+
+        public init(activeEventID: String? = nil, nextChange: Date? = nil) {
+            self.activeEventID = activeEventID
+            self.nextChange = nextChange
+        }
     }
 
     /// Events must have a meeting link and not be all-day. An event is
