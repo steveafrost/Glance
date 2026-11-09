@@ -301,70 +301,127 @@ struct SettingsView: View {
 
 private struct GeneralSettings: View {
     @ObservedObject var state: SettingsState
+    @Environment(\.palette) private var p
+    private var prefs: Preferences { .shared }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Section {
-                Toggle("Open at login", isOn: Binding(get: { state.launchAtLogin }, set: { state.setLaunchAtLogin($0) }))
-                if let error = state.loginError {
-                    HStack {
-                        Text(error).font(.caption).foregroundStyle(.red)
-                        Button("Open Login Items") { LoginItem.openSystemSettings() }.controlSize(.small)
+        VStack(alignment: .leading, spacing: 18) {
+            SettingsSection {
+                SettingsRow(label: "Open at login", caption: state.loginError) {
+                    HStack(spacing: 8) {
+                        if state.loginError != nil {
+                            AccentLink(title: "Open Login Items") { LoginItem.openSystemSettings() }
+                        }
+                        ThemedSwitch(isOn: Binding(get: { state.launchAtLogin }, set: { state.setLaunchAtLogin($0) }))
                     }
                 }
-                LabeledContent("Show or hide calendar") {
-                    HotKeyRecorder(combo: state.binding(\.hotKey), error: $state.hotKeyError)
-                        .frame(width: 160, height: 22)
-                }
-                if let error = state.hotKeyError {
-                    Text(error).font(.caption).foregroundStyle(.red)
+                SettingsRow(label: "Show or hide calendar", caption: state.hotKeyError ?? "A shortcut that works in any app") {
+                    HotKeyField(combo: state.binding(\.hotKey), error: $state.hotKeyError)
                 }
             }
-            Section("Menu bar") {
-                Picker("Icon", selection: state.binding(\.iconStyle)) {
-                    Text("Outline").tag(IconLayout.Style.outline)
-                    Text("Filled").tag(IconLayout.Style.filled)
+
+            SettingsSection(title: "Menu bar") {
+                SettingsRow(label: "Icon") {
+                    ThemedMenuPicker(selection: iconChoice, options: SettingsModel.IconChoice.allCases.map { ($0, $0.title) },
+                                     width: 120)
                 }
-                Toggle("Hide the date icon", isOn: state.binding(\.hideIcon))
-                ClockFormatField(format: state.binding(\.clockFormat))
-                Toggle("Show a meeting indicator", isOn: state.binding(\.showMeetingIndicator))
-                Stepper(value: state.binding(\.meetingLeadMinutes), in: 0...30) {
-                    Text("Show it \(Preferences.shared.meetingLeadMinutes) min before a call starts")
+                if SettingsModel.showsEmptyItemWarning(icon: iconChoice.wrappedValue, clockPattern: prefs.clockFormat) {
+                    SettingsNote(text: "With no icon and no clock there’s nothing to click, so Glance keeps showing the date icon.")
                 }
-                .disabled(!Preferences.shared.showMeetingIndicator)
-                Toggle("Always open at the top right of the screen", isOn: state.binding(\.alwaysTopRight))
+                ClockRows(state: state)
+                SettingsRow(label: "Meeting indicator", caption: "A camera beside the icon while a call is on or about to start") {
+                    ThemedSwitch(isOn: state.binding(\.showMeetingIndicator))
+                }
+                SettingsRow(label: "Meeting indicator lead time", disabled: !prefs.showMeetingIndicator) {
+                    ThemedStepper(value: state.binding(\.meetingLeadMinutes), range: 0...30, format: SettingsModel.minutes)
+                }
+                SettingsRow(label: "Open at the top right of the screen", caption: "Instead of under the menu bar icon") {
+                    ThemedSwitch(isOn: state.binding(\.alwaysTopRight))
+                }
             }
-            Section("Agenda") {
-                Stepper(value: state.binding(\.agendaDays), in: 1...31) {
-                    Text("Show \(Preferences.shared.agendaDays) day\(Preferences.shared.agendaDays == 1 ? "" : "s") of events")
+
+            SettingsSection(title: "Agenda") {
+                SettingsRow(label: "Agenda length") {
+                    ThemedStepper(value: state.binding(\.agendaDays), range: 1...31, format: SettingsModel.days)
                 }
-                Toggle("Show days without events", isOn: state.binding(\.showEmptyAgendaDays))
+                SettingsRow(label: "Show days without events") {
+                    ThemedSwitch(isOn: state.binding(\.showEmptyAgendaDays))
+                }
             }
         }
+    }
 
+    private var iconChoice: Binding<SettingsModel.IconChoice> {
+        Binding(get: { SettingsModel.IconChoice(style: prefs.iconStyle, hidden: prefs.hideIcon) },
+                set: { choice in
+                    prefs.iconStyle = choice.style(keeping: prefs.iconStyle)
+                    prefs.hideIcon = choice.hidesIcon
+                    state.objectWillChange.send()
+                })
     }
 }
 
-private struct ClockFormatField: View {
-    @Binding var format: String
-    @State private var text = ""
+/// Clock presets with a live preview; the raw pattern only for Custom.
+private struct ClockRows: View {
+    @ObservedObject var state: SettingsState
+    @State private var custom = SettingsModel.ClockPreset.matching(Preferences.shared.clockFormat) == .custom
+    @State private var text = Preferences.shared.clockFormat
+    @Environment(\.palette) private var p
+
+    private var pattern: String { Preferences.shared.clockFormat }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            TextField("Clock format", text: $text, prompt: Text("e.g. EEE h:mm a"))
-                .onSubmit { format = text }
-                .onChange(of: text) { _, new in format = new }
-            Text(preview).font(.caption).foregroundStyle(.secondary)
+        // The caption previews what the menu bar shows, ticking while visible.
+        TimelineView(.periodic(from: .now, by: ClockFormat(pattern).usesSeconds ? 1 : 15)) { ctx in
+            SettingsRow(label: "Clock", caption: Self.preview(pattern, at: ctx.date)) {
+                ThemedMenuPicker(selection: preset, options: SettingsModel.ClockPreset.allCases.map { ($0, title($0)) },
+                                 width: 170)
+            }
         }
-        .onAppear { text = format }
+        if custom {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack {
+                    Text("Pattern").font(.system(size: 13)).foregroundStyle(p.text)
+                    Spacer()
+                    ThemedTextField(placeholder: "EEE h:mm a", text: $text, width: 200, monospaced: true)
+                        .onChange(of: text) { _, new in Preferences.shared.clockFormat = new }
+                }
+                Text("Unicode date pattern: EEE weekday, d day, MMM month, h:mm a time, HH:mm 24-hour, ss seconds.")
+                    .font(.system(size: 11)).foregroundStyle(p.subtext0).fixedSize(horizontal: false, vertical: true)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+        }
     }
 
-    private var preview: String {
-        let f = ClockFormat(text)
-        if f.isEmpty { return "Leave empty to show only the date icon. Uses Unicode date patterns: EEE d MMM h:mm a" }
+    private var preset: Binding<SettingsModel.ClockPreset> {
+        Binding(get: { custom ? .custom : SettingsModel.ClockPreset.matching(pattern) },
+                set: { new in
+                    if new == .custom {
+                        custom = true
+                        text = pattern
+                    } else {
+                        custom = false
+                        Preferences.shared.clockFormat = new.pattern ?? ""
+                        text = Preferences.shared.clockFormat
+                    }
+                    state.objectWillChange.send()
+                })
+    }
+
+    static func preview(_ pattern: String, at now: Date) -> String {
+        if ClockFormat(pattern).isEmpty { return "No clock text" }
         let df = DateFormatter()
-        df.dateFormat = text
-        return "Preview: " + df.string(from: Date())
+        df.locale = .autoupdatingCurrent
+        df.dateFormat = pattern
+        return "Shows “\(df.string(from: now))”"
+    }
+
+    private func title(_ preset: SettingsModel.ClockPreset) -> String {
+        let df = DateFormatter()
+        df.locale = .autoupdatingCurrent
+        let sample = SettingsModel.ClockPreset.sampleDate(calendar: .autoupdatingCurrent)
+        return preset.title { df.dateFormat = $0; return df.string(from: sample) }
     }
 }
 
@@ -446,32 +503,61 @@ private struct CalendarSettings: View {
     }
 }
 
+/// The hotkey recorder with an inline clear button.
+private struct HotKeyField: View {
+    @Binding var combo: KeyCombo?
+    @Binding var error: String?
+    @State private var recording = false
+    @Environment(\.palette) private var p
+
+    var body: some View {
+        HotKeyRecorder(combo: $combo, error: $error, recording: $recording, palette: p)
+            .frame(width: 160, height: 24)
+            .overlay(alignment: .trailing) {
+                if combo != nil && !recording {
+                    Button { combo = nil; error = nil } label: {
+                        Image(systemName: "xmark.circle.fill").font(.system(size: 12)).foregroundStyle(p.overlay0)
+                            .frame(width: 22, height: 22).contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .help("Clear the shortcut")
+                    .padding(.trailing, 2)
+                }
+            }
+    }
+}
+
 /// Click, then press a shortcut. Esc cancels, Delete clears.
 struct HotKeyRecorder: NSViewRepresentable {
     @Binding var combo: KeyCombo?
     @Binding var error: String?
+    @Binding var recording: Bool
+    var palette: SettingsPalette
 
     func makeNSView(context: Context) -> RecorderView {
         let v = RecorderView()
         v.onChange = { combo = $0; error = nil }
         v.onError = { error = $0 }
+        v.onRecording = { recording = $0 }
         return v
     }
 
     func updateNSView(_ v: RecorderView, context: Context) {
         v.combo = combo
+        v.palette = palette
     }
 
     @MainActor
     final class RecorderView: NSView {
         var combo: KeyCombo? { didSet { needsDisplay = true } }
+        var palette: SettingsPalette? { didSet { needsDisplay = true } }
         var onChange: ((KeyCombo?) -> Void)?
         var onError: ((String) -> Void)?
-        private var recording = false { didSet { needsDisplay = true } }
+        var onRecording: ((Bool) -> Void)?
+        private var recording = false { didSet { needsDisplay = true; if recording != oldValue { onRecording?(recording) } } }
 
         override var acceptsFirstResponder: Bool { true }
-        override var focusRingMaskBounds: NSRect { bounds }
-        override func drawFocusRingMask() { NSBezierPath(roundedRect: bounds, xRadius: 5, yRadius: 5).fill() }
+        override var focusRingType: NSFocusRingType { get { .none } set {} }
 
         override func mouseDown(with event: NSEvent) {
             window?.makeFirstResponder(self)
@@ -498,17 +584,20 @@ struct HotKeyRecorder: NSViewRepresentable {
         }
 
         override func keyDown(with event: NSEvent) {
-            guard recording else { super.keyDown(with: event); return }
+            guard recording else {
+                if event.keyCode == 49 || event.keyCode == 36 { mouseDown(with: event) } else { super.keyDown(with: event) }
+                return
+            }
             let flags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
             if event.keyCode == 53, flags.isEmpty { stopRecording(); return }             // Esc
             if event.keyCode == 51 || event.keyCode == 117, flags.isEmpty {               // Delete
-                recording = false
+                stopRecording()
                 onChange?(nil)
                 return
             }
             let c = KeyCombo(keyCode: UInt32(event.keyCode), carbonModifiers: KeyboardLayout.carbonModifiers(flags))
             guard c.isValidGlobalHotKey else {
-                onError?("Add ⌘, ⌥ or ⌃ to the shortcut so it doesn’t interfere with typing.")
+                onError?("Add ⌘, ⌥ or ⌃ so the shortcut doesn’t interfere with typing.")
                 return
             }
             recording = false
@@ -516,19 +605,21 @@ struct HotKeyRecorder: NSViewRepresentable {
         }
 
         override func draw(_ dirtyRect: NSRect) {
-            let path = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: 5, yRadius: 5)
-            NSColor.controlBackgroundColor.setFill()
+            guard let p = palette else { return }
+            let ring: CGFloat = recording ? 2 : 1
+            let path = NSBezierPath(roundedRect: bounds.insetBy(dx: ring / 2, dy: ring / 2), xRadius: 6, yRadius: 6)
+            NSColor(p.surface0).setFill()
             path.fill()
-            NSColor.separatorColor.setStroke()
+            NSColor(recording ? p.accent : p.surface1).setStroke()
+            path.lineWidth = ring
             path.stroke()
             let text: String
-            if recording { text = "Type shortcut…" }
-            else if let combo { text = combo.displayString(characterForKeyCode: KeyboardLayout.character(for:)) }
-            else { text = "Click to record" }
-            let attrs: [NSAttributedString.Key: Any] = [
-                .font: NSFont.systemFont(ofSize: 12),
-                .foregroundColor: (recording || combo == nil) ? NSColor.secondaryLabelColor : NSColor.labelColor,
-            ]
+            let colour: NSColor
+            if recording { text = "Press keys…"; colour = NSColor(p.accent) }
+            else if let combo { text = combo.displayString(characterForKeyCode: KeyboardLayout.character(for:)); colour = NSColor(p.text) }
+            else { text = "Record Shortcut"; colour = NSColor(p.subtext0) }
+            let attrs: [NSAttributedString.Key: Any] = [.font: NSFont.systemFont(ofSize: 12, weight: combo != nil && !recording ? .medium : .regular),
+                                                        .foregroundColor: colour]
             let size = (text as NSString).size(withAttributes: attrs)
             (text as NSString).draw(at: CGPoint(x: (bounds.width - size.width) / 2, y: (bounds.height - size.height) / 2), withAttributes: attrs)
         }
