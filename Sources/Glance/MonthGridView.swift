@@ -84,6 +84,10 @@ final class MonthGridView: NSView {
             }
         }
 
+        // Faint diagonal hatching in the out-of-month gaps of the visible rows.
+        drawHatching(in: grid.blankIndices.map(g.cellRect(index:)).filter { $0.intersects(dirtyRect) },
+                     color: colors.overlay0.withAlphaComponent(colors.isDark ? 0.22 : 0.18))
+
         // One device-pixel grid for snapping: 2 on Retina and in 2x renders.
         let scale = NSGraphicsContext.current.map { abs($0.cgContext.userSpaceToDeviceSpaceTransform.a) }
             ?? window?.backingScaleFactor ?? 1
@@ -135,6 +139,28 @@ final class MonthGridView: NSView {
         let r = DigitInk.bounds(of: s, font: bold ? todayFont : dayFont)
         inkCache[key] = r
         return r
+    }
+
+    /// 135° lines, 1pt wide every 5pt, clipped to each cell's rounded inset.
+    private func drawHatching(in cells: [CGRect], color: NSColor) {
+        guard !cells.isEmpty, let ctx = NSGraphicsContext.current else { return }
+        color.setStroke()
+        for cell in cells {
+            let r = cell.insetBy(dx: 2, dy: 3)
+            ctx.saveGraphicsState()
+            NSBezierPath(roundedRect: r, xRadius: 5, yRadius: 5).addClip()
+            let lines = NSBezierPath()
+            lines.lineWidth = 1
+            var x = r.minX - r.height
+            while x < r.maxX {
+                // Flipped view: y grows downward, so this runs bottom-left to top-right.
+                lines.move(to: CGPoint(x: x, y: r.maxY))
+                lines.line(to: CGPoint(x: x + r.height, y: r.minY))
+                x += 5
+            }
+            lines.stroke()
+            ctx.restoreGraphicsState()
+        }
     }
 
     private func drawCentered(_ s: String, in rect: CGRect, font: NSFont, color: NSColor) {

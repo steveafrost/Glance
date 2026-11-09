@@ -155,6 +155,20 @@ final class MonthGridTests: XCTestCase {
         XCTAssertEqual(dayRows(grid(2026, 8, 2)), 6)
     }
 
+    func testBlankIndicesAreTheGapsInVisibleRows() {
+        // August 2026, Sunday start: six leading blanks (Sat 1st), 31 days, five trailing.
+        XCTAssertEqual(grid(2026, 8, 1).blankIndices, Array(0..<6) + Array(37..<42))
+        // February 2026, Sunday start: exactly four full weeks, no gaps.
+        XCTAssertEqual(grid(2026, 2, 1).blankIndices, [])
+        for fw in 1...7 {
+            for m in 1...12 {
+                let g = grid(2026, m, fw)
+                XCTAssertEqual(g.blankIndices.count, g.visibleRows * 7 - g.month.numberOfDays)
+                XCTAssertTrue(g.blankIndices.allSatisfy { $0 / 7 < g.visibleRows && !g.isInMonth(index: $0) })
+            }
+        }
+    }
+
     func testRowsWithDaysAreLeadingAndContiguous() {
         for fw in 1...7 {
             for y in 2025...2028 {

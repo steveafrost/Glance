@@ -44,6 +44,12 @@ public struct MonthGrid: Sendable, Equatable {
         (leadingBlanks..<(leadingBlanks + month.numberOfDays)).contains(index)
     }
 
+    /// Empty out-of-month slots inside the visible rows: the leading gap
+    /// before the 1st and the trailing gap after the last day. Drawn hatched.
+    public var blankIndices: [Int] {
+        (0..<(visibleRows * Self.columns)).filter { !isInMonth(index: $0) }
+    }
+
     /// The day shown at `index`, or nil for an empty out-of-month slot.
     public func visibleDay(at index: Int) -> DayKey? { isInMonth(index: index) ? days[index] : nil }
 
