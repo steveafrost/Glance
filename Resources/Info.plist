@@ -29,7 +29,7 @@
     <key>LSUIElement</key>
     <true/>
     <key>NSCalendarsFullAccessUsageDescription</key>
-    <string>Glance shows your events in the menu bar calendar and lets you create, edit and join them.</string>
+    <string>Glance shows your events in the menu bar calendar and lets you create, edit and join them. Your calendars stay on this Mac: Glance never sends them anywhere.</string>
     <key>NSHumanReadableCopyright</key>
     <string>Copyright © 2026 Steve Frost. Behaviour modelled on Itsycal by Sanjay Madan (MIT).</string>
     <key>NSPrincipalClass</key>

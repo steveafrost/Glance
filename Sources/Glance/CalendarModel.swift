@@ -34,6 +34,17 @@ final class CalendarModel {
     }
 
     func start() async {
+        let args = ProcessInfo.processInfo.arguments
+        if let i = args.firstIndex(of: "--qa-access"), i + 1 < args.count {
+            // QA: show an access state without touching the real permission.
+            switch args[i + 1] {
+            case "unknown": access = .unknown
+            case "error": access = .error("The operation couldn’t be completed.")
+            default: access = .denied
+            }
+            onChange?()
+            return
+        }
         switch EventRepository.authorization {
         case .fullAccess:
             access = .granted

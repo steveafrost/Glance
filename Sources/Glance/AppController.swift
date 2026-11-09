@@ -92,7 +92,11 @@ final class AppController: NSObject, NSWindowDelegate {
                 month = selected.monthKey
             }
         }
-        if args.contains("--show") {
+        // First run (calendar permission never asked): open the calendar
+        // under the icon so a new user sees where Glance lives, next to the
+        // permission prompt.
+        let firstRun = EventRepository.authorization == .notDetermined && !args.contains { $0.hasPrefix("--qa") }
+        if args.contains("--show") || firstRun {
             DispatchQueue.main.asyncAfter(deadline: .now() + 1) { [weak self] in self?.showCalendar() }
         }
     }
