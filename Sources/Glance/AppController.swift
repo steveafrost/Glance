@@ -108,6 +108,15 @@ final class AppController: NSObject, NSWindowDelegate {
                 delay += 0.8
                 continue
             }
+            if key == "dump-grid" {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    guard let self else { return }
+                    self.content.grid.publishQADump(background: self.colors.background)
+                    log.notice("qa dump-grid \(self.content.grid.model.grid.month.description, privacy: .public)")
+                }
+                delay += 0.5
+                continue
+            }
             if key == "edit-first" {
                 // Open the editor on the first timed agenda event (no changes are saved).
                 DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in

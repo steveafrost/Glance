@@ -75,6 +75,11 @@ alignment checks, `--qa-keys "right,shift+down,return,swipe-left"`
 feeds input through the real handlers. Any preference can be overridden for
 one run, e.g. `-theme mocha -clockFormat "EEE h:mm a"`.
 
+`script/measure-grid.sh OUT LABEL THEME KEYS [prefs]` measures how far each
+day's event dots sit from the centre of its number's ink, in points, from a
+screenshot and from offscreen 1x and 2x renders (the `dump-grid` QA key), e.g.
+`script/measure-grid.sh /tmp/m dec latte right -highlightedWeekdays 0`.
+
 ## Credits
 
 Glance is a from-scratch rewrite whose behaviour is modelled on
