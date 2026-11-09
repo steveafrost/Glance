@@ -1,8 +1,12 @@
 import CoreGraphics
+import CoreText
+import Foundation
 
 /// Where a day cell's pill, selection ring, digits and event dots go.
 /// Each dot row sits midway between the digits' baseline and the ring's
 /// inner edge, so the gaps above and below match and can't drift apart.
+/// Horizontally the digits' ink and the dot row share one centre,
+/// `centerX`, snapped once to a device pixel; nothing rounds separately.
 public struct DayCellLayout: Equatable, Sendable {
     /// Vertical metrics of the day-number font.
     public struct FontMetrics: Equatable, Sendable {
@@ -27,11 +31,25 @@ public struct DayCellLayout: Equatable, Sendable {
 
     public let cell: CGRect
     public let font: FontMetrics
+    /// Device pixels per point (the backing scale), for pixel snapping.
+    public let scale: CGFloat
 
-    public init(cell: CGRect, font: FontMetrics) {
+    public init(cell: CGRect, font: FontMetrics, scale: CGFloat = 1) {
         self.cell = cell
         self.font = font
+        self.scale = max(scale, 1)
     }
+
+    private func snap(_ v: CGFloat) -> CGFloat { (v * scale).rounded() / scale }
+
+    /// The cell's single horizontal centre, on a whole device pixel.
+    public var centerX: CGFloat { snap(cell.midX) }
+
+    /// Where to draw the day number (its pen origin and line-box top) so its
+    /// ink, not its advance box, centres on `centerX`. `ink` is the glyph
+    /// bounds relative to the pen origin (see `DigitInk.bounds`). The x
+    /// stays fractional; text is positioned at subpixel precision.
+    public func textOrigin(ink: CGRect) -> CGPoint { CGPoint(x: centerX - ink.midX, y: textTop) }
 
     /// The today / hover fill.
     public var pill: CGRect { cell.insetBy(dx: Self.pillInset, dy: Self.pillInset) }
@@ -54,9 +72,20 @@ public struct DayCellLayout: Equatable, Sendable {
         let n = min(max(count, 0), Self.maxDots)
         guard n > 0 else { return [] }
         let total = CGFloat(n) * Self.dotSize + CGFloat(n - 1) * Self.dotSpacing
-        let x0 = (cell.midX - total / 2).rounded()
+        // total is even, so with centerX on a pixel every dot is too.
+        let x0 = centerX - total / 2
         return (0..<n).map {
             CGRect(x: x0 + CGFloat($0) * (Self.dotSize + Self.dotSpacing), y: dotTop, width: Self.dotSize, height: Self.dotSize)
         }
+    }
+}
+
+/// Glyph ink of a short string, measured with CoreText.
+public enum DigitInk {
+    /// The string's glyph bounds relative to its pen origin: x from the
+    /// origin, y up from the baseline. Path bounds, so no context is needed.
+    public static func bounds(of string: String, font: CTFont) -> CGRect {
+        let attributed = NSAttributedString(string: string, attributes: [kCTFontAttributeName as NSAttributedString.Key: font])
+        return CTLineGetBoundsWithOptions(CTLineCreateWithAttributedString(attributed), .useGlyphPathBounds)
     }
 }

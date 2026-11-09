@@ -84,12 +84,14 @@ final class MonthGridView: NSView {
             }
         }
 
-        let dayFont = Self.dayFont, todayFont = Self.todayFont
+        // One device-pixel grid for snapping: 2 on Retina and in 2x renders.
+        let scale = NSGraphicsContext.current.map { abs($0.cgContext.userSpaceToDeviceSpaceTransform.a) }
+            ?? window?.backingScaleFactor ?? 1
         // Only the month's own days; out-of-month slots stay empty.
         for (i, day) in grid.days.enumerated() where grid.isInMonth(index: i) {
             let cell = g.cellRect(index: i)
             guard cell.intersects(dirtyRect) else { continue }
-            let layout = DayCellLayout(cell: cell, font: Self.dayMetrics)
+            let layout = DayCellLayout(cell: cell, font: Self.dayMetrics, scale: scale)
             let isToday = day == model.today
             if isToday {
                 colors.today.setFill()
@@ -105,8 +107,9 @@ final class MonthGridView: NSView {
                 (isToday ? colors.onToday : colors.selection).setStroke()
                 ring.stroke()
             }
-            drawDay(String(day.day), x: cell.midX, top: layout.textTop, font: isToday ? todayFont : dayFont,
-                    color: isToday ? colors.onToday : colors.primaryText)
+            let text = String(day.day), font = isToday ? Self.todayFont : Self.dayFont
+            (text as NSString).draw(at: layout.textOrigin(ink: Self.ink(text, bold: isToday)),
+                                    withAttributes: [.font: font, .foregroundColor: isToday ? colors.onToday : colors.primaryText])
 
             if let dots = model.dots[day], !dots.isEmpty {
                 for (rect, c) in zip(layout.dotRects(count: dots.count), dots) {
@@ -124,10 +127,14 @@ final class MonthGridView: NSView {
         return .init(lineHeight: size.height, ascender: dayFont.ascender, capHeight: dayFont.capHeight)
     }()
 
-    private func drawDay(_ s: String, x: CGFloat, top: CGFloat, font: NSFont, color: NSColor) {
-        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
-        let w = (s as NSString).size(withAttributes: attrs).width
-        (s as NSString).draw(at: CGPoint(x: (x - w / 2).rounded(), y: top), withAttributes: attrs)
+    /// Ink bounds of each day number, measured once: 31 strings in 2 weights.
+    private static var inkCache: [String: CGRect] = [:]
+    private static func ink(_ s: String, bold: Bool) -> CGRect {
+        let key = bold ? "b" + s : s
+        if let r = inkCache[key] { return r }
+        let r = DigitInk.bounds(of: s, font: bold ? todayFont : dayFont)
+        inkCache[key] = r
+        return r
     }
 
     private func drawCentered(_ s: String, in rect: CGRect, font: NSFont, color: NSColor) {

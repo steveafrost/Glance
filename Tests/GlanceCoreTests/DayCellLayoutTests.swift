@@ -51,4 +51,66 @@ final class DayCellLayoutTests: XCTestCase {
             XCTAssertEqual(r.first!.minY, r.first!.minY.rounded(), "whole-point y")
         }
     }
+
+    // MARK: Horizontal centring
+
+    /// The grid's monospaced-digit 13pt system font, in a given weight.
+    private func digitFont(bold: Bool) -> CTFont {
+        let base = CTFontCreateUIFontForLanguage(bold ? .emphasizedSystem : .system, 13, nil)!
+        let desc = CTFontDescriptorCreateCopyWithFeature(CTFontCopyFontDescriptor(base),
+                                                         kNumberSpacingType as CFNumber, kMonospacedNumbersSelector as CFNumber)
+        return CTFontCreateWithFontDescriptor(desc, 13, nil)
+    }
+
+    private let samples = ["1", "7", "11", "20", "31"]
+
+    func testDotsCentreOnTheDigitsInk() {
+        for width: CGFloat in [33, 32] { // odd and even cell widths
+            for scale: CGFloat in [1, 2] {
+                for origin: CGFloat in [0, 24, 57] {
+                    let cell = CGRect(x: origin + width, y: 20, width: width, height: 29)
+                    let l = DayCellLayout(cell: cell, font: metrics, scale: scale)
+                    for bold in [false, true] {
+                        for s in samples {
+                            let ink = DigitInk.bounds(of: s, font: digitFont(bold: bold))
+                            let inkCentre = l.textOrigin(ink: ink).x + ink.midX
+                            for n in 1...3 {
+                                let dots = l.dotRects(count: n)
+                                let dotCentre = (dots.first!.minX + dots.last!.maxX) / 2
+                                XCTAssertLessThanOrEqual(abs(dotCentre - inkCentre), 0.25,
+                                                         "\(s) bold \(bold), \(n) dots, width \(width) @\(scale)x")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    func testSharedCentreAndDotsLandOnDevicePixels() {
+        for width: CGFloat in [33, 32] {
+            for scale: CGFloat in [1, 2, 3] {
+                let cell = CGRect(x: 24 + width * 3, y: 0, width: width, height: 29)
+                let l = DayCellLayout(cell: cell, font: metrics, scale: scale)
+                XCTAssertEqual(l.centerX * scale, (l.centerX * scale).rounded())
+                XCTAssertLessThanOrEqual(abs(l.centerX - cell.midX), 0.5 / scale)
+                for n in 1...3 {
+                    for d in l.dotRects(count: n) {
+                        XCTAssertEqual(d.minX * scale, (d.minX * scale).rounded(), "\(n) dots @\(scale)x")
+                    }
+                }
+            }
+        }
+    }
+
+    func testInkIsNotTheAdvanceBox() {
+        // Why the ink is measured: "1" sits well off-centre in its advance box,
+        // so centring the advance width would leave the dots visibly off.
+        let f = digitFont(bold: false)
+        let line = CTLineCreateWithAttributedString(NSAttributedString(string: "1", attributes: [kCTFontAttributeName as NSAttributedString.Key: f]))
+        let advance = CGFloat(CTLineGetTypographicBounds(line, nil, nil, nil))
+        let ink = DigitInk.bounds(of: "1", font: f)
+        XCTAssertGreaterThan(ink.width, 0)
+        XCTAssertGreaterThan(abs(advance / 2 - ink.midX), 0.25, "advance \(advance) ink \(ink)")
+    }
 }
