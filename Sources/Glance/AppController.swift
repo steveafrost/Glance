@@ -38,7 +38,8 @@ final class AppController: NSObject, NSWindowDelegate {
         month = t.monthKey
         let grid = MonthGridView(model: .init(grid: MonthGrid(month: t.monthKey, firstWeekday: Preferences.shared.firstWeekday),
                                               selected: t, today: t, highlighted: Preferences.shared.highlightedWeekdays,
-                                              dots: [:], geometry: GridGeometry(showsWeekNumbers: Preferences.shared.showWeekNumbers)))
+                                              dots: [:], geometry: GridGeometry(showsWeekNumbers: Preferences.shared.showWeekNumbers,
+                                                                    rows: MonthGrid.rows)))
         content = CalendarContentView(grid: grid)
         super.init()
     }
@@ -362,8 +363,8 @@ final class AppController: NSObject, NSWindowDelegate {
                 dots[day] = colors
             }
         }
-        let geometry = GridGeometry(showsWeekNumbers: prefs.showWeekNumbers, rows: grid.visibleRows)
-        let rowsChanged = geometry.rows != content.grid.model.geometry.rows
+        // Always 6 rows, so the window height doesn't change between months.
+        let geometry = GridGeometry(showsWeekNumbers: prefs.showWeekNumbers, rows: MonthGrid.rows)
         content.grid.model = .init(grid: grid, selected: selected, today: today,
                                    highlighted: prefs.highlightedWeekdays, dots: dots, geometry: geometry)
 
@@ -393,7 +394,6 @@ final class AppController: NSObject, NSWindowDelegate {
         content.agenda.setRows(Agenda.rows(eventsByDay: byDay, start: selected, days: prefs.agendaDays,
                                            showEmptyDays: prefs.showEmptyAgendaDays))
         updateMeetingState()
-        if rowsChanged { content.needsLayout = true }
         if window.isVisible { positionWindow(initial: false) }
     }
 

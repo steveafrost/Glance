@@ -8,7 +8,8 @@ public struct GridGeometry: Equatable, Sendable {
     public var headerHeight: CGFloat
     public var weekColumnWidth: CGFloat
     public var showsWeekNumbers: Bool
-    /// Week rows shown (a month's `visibleRows`).
+    /// Week rows laid out. The app always uses `MonthGrid.rows` (6) so the
+    /// grid height is the same for every month.
     public var rows: Int
 
     public init(cellWidth: CGFloat = 33, cellHeight: CGFloat = 29, headerHeight: CGFloat = 20,
@@ -44,7 +45,7 @@ public struct GridGeometry: Equatable, Sendable {
         return CGRect(x: 0, y: headerHeight + CGFloat(row) * cellHeight, width: weekColumnWidth, height: cellHeight)
     }
 
-    /// The day column band (header plus the visible rows), for weekday highlighting.
+    /// The day column band (header plus all rows), for weekday highlighting.
     public func columnRect(column: Int) -> CGRect {
         CGRect(x: gridOriginX + CGFloat(column) * cellWidth, y: 0,
                width: cellWidth, height: size.height)

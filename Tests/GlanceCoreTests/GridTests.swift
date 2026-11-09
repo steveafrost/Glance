@@ -29,6 +29,73 @@ final class GridGeometryTests: XCTestCase {
     }
 }
 
+final class FixedGridHeightTests: XCTestCase {
+    /// The geometry the app builds for a month (always 6 rows).
+    private func appGeometry(weekNumbers: Bool) -> GridGeometry {
+        GridGeometry(showsWeekNumbers: weekNumbers, rows: MonthGrid.rows)
+    }
+
+    func testSizeIsTheSameForFourFiveAndSixWeekMonths() {
+        // Feb 2026 covers 4 weeks, Nov 2026 5 and Aug 2026 6 with a Sunday
+        // start (5, 6 and 6 with Monday). The geometry doesn't depend on the
+        // month, and every month's days fit inside it.
+        for weekNumbers in [false, true] {
+            let g = appGeometry(weekNumbers: weekNumbers)
+            XCTAssertEqual(g.rows, 6)
+            XCTAssertEqual(g.size, CGSize(width: weekNumbers ? 255 : 231, height: 194))
+            for fw in [1, 2] {
+                for m in [2, 11, 8] {
+                    let grid = MonthGrid(month: MonthKey(year: 2026, month: m), firstWeekday: fw)
+                    for i in 0..<42 where grid.isInMonth(index: i) {
+                        XCTAssertTrue(CGRect(origin: .zero, size: g.size).contains(g.cellRect(index: i)), "2026-\(m) fw\(fw) #\(i)")
+                    }
+                }
+            }
+        }
+    }
+
+    func testColumnShadingSpansAllSixRows() {
+        let g = appGeometry(weekNumbers: true)
+        for col in 0..<7 {
+            XCTAssertEqual(g.columnRect(column: col).height, g.size.height)
+            XCTAssertEqual(g.columnRect(column: col).maxY, g.cellRect(index: 35 + col).maxY)
+        }
+    }
+
+    func testEmptyTrailingRowHitTestsToBlankCells() {
+        // Feb 2026 (Sunday start): rows 5 and 6 are laid out but hold no days.
+        let grid = MonthGrid(month: MonthKey(year: 2026, month: 2), firstWeekday: 1)
+        let g = appGeometry(weekNumbers: false)
+        for i in 28..<42 {
+            let r = g.cellRect(index: i)
+            XCTAssertEqual(g.index(at: CGPoint(x: r.midX, y: r.midY)), i)
+            XCTAssertNil(grid.visibleDay(at: i))
+        }
+    }
+
+    func testKeyboardMovesNeverLandOnABlankCell() {
+        // The selection is always a day of the shown month (the month follows
+        // the selection), so it always maps to an in-month cell.
+        for fw in [1, 2] {
+            var day = DayKey(year: 2025, month: 12, day: 1)
+            for _ in 0..<500 {
+                for n in [1, -1, 7, -7] {
+                    let next = day.adding(days: n)
+                    let g = MonthGrid(month: next.monthKey, firstWeekday: fw)
+                    let i = try! XCTUnwrap(g.index(of: next))
+                    XCTAssertTrue(g.isInMonth(index: i))
+                }
+                for n in [1, -1, 12, -12] {
+                    let next = GridNavigation.day(day, movedByMonths: n)
+                    let g = MonthGrid(month: next.monthKey, firstWeekday: fw)
+                    XCTAssertTrue(g.isInMonth(index: try! XCTUnwrap(g.index(of: next))))
+                }
+                day = day.adding(days: 1)
+            }
+        }
+    }
+}
+
 final class GridNavigationTests: XCTestCase {
     func testItsycalKeyMap() {
         XCTAssertEqual(GridNavigation.command(for: .left, modifiers: []), .moveMonths(-1))

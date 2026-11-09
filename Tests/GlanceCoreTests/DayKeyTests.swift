@@ -116,55 +116,71 @@ final class MonthGridTests: XCTestCase {
 
     private func grid(_ y: Int, _ m: Int, _ fw: Int) -> MonthGrid { MonthGrid(month: MonthKey(year: y, month: m), firstWeekday: fw) }
 
-    func testFourRowFebruary() {
+    /// Rows holding days of the month (the rest of the 6 laid-out rows stay empty).
+    private func dayRows(_ g: MonthGrid) -> Int { (0..<MonthGrid.rows).filter(g.rowHasDays).count }
+
+    func testFourWeekFebruary() {
         // 1 Feb 2026 is a Sunday and February has 28 days.
         let g = grid(2026, 2, 1)
         XCTAssertEqual(g.leadingBlanks, 0)
-        XCTAssertEqual(g.visibleRows, 4)
+        XCTAssertEqual(dayRows(g), 4)
         XCTAssertEqual(g.visibleDay(at: 27), DayKey(year: 2026, month: 2, day: 28))
-        XCTAssertNil(g.visibleDay(at: 28))
-        XCTAssertEqual(g.weekNumbers().count, 4)
-        // Monday start pushes the 1st to the last column: 5 rows.
+        for i in 28..<42 { XCTAssertNil(g.visibleDay(at: i), "\(i)") }
+        XCTAssertFalse(g.rowHasDays(4))
+        XCTAssertFalse(g.rowHasDays(5))
+        // Monday start pushes the 1st to the last column: 5 weeks.
         XCTAssertEqual(grid(2026, 2, 2).leadingBlanks, 6)
-        XCTAssertEqual(grid(2026, 2, 2).visibleRows, 5)
+        XCTAssertEqual(dayRows(grid(2026, 2, 2)), 5)
     }
 
-    func testFiveRowNovember() {
+    func testFiveWeekNovember() {
         // November 2026 with a Sunday start ends on Monday 30 in row 5; the
-        // all-December sixth row (6–12 Dec) isn't shown.
+        // sixth row (6–12 Dec) is laid out but empty.
         let g = grid(2026, 11, 1)
-        XCTAssertEqual(g.visibleRows, 5)
+        XCTAssertEqual(dayRows(g), 5)
         XCTAssertTrue(g.isInMonth(index: 29))
         for i in 30..<42 { XCTAssertFalse(g.isInMonth(index: i), "\(i)") }
         XCTAssertNil(g.visibleDay(at: 30))
-        // Monday start leads with six October slots and needs 6 rows.
+        // Monday start leads with six October slots and needs 6 weeks.
         let m = grid(2026, 11, 2)
-        XCTAssertEqual(m.visibleRows, 6)
+        XCTAssertEqual(dayRows(m), 6)
         for i in 0..<6 { XCTAssertNil(m.visibleDay(at: i)) }
         XCTAssertEqual(m.visibleDay(at: 6), DayKey(year: 2026, month: 11, day: 1))
     }
 
-    func testSixRowAugust() {
+    func testSixWeekAugust() {
         // 1 Aug 2026 is a Saturday; 31 days spill into a sixth row.
-        XCTAssertEqual(grid(2026, 8, 1).visibleRows, 6)
+        XCTAssertEqual(dayRows(grid(2026, 8, 1)), 6)
         XCTAssertEqual(grid(2026, 8, 1).visibleDay(at: 36), DayKey(year: 2026, month: 8, day: 31))
-        XCTAssertEqual(grid(2026, 8, 2).visibleRows, 6)
+        XCTAssertEqual(dayRows(grid(2026, 8, 2)), 6)
     }
 
-    func testNoRowIsEntirelyOutOfMonth() {
+    func testRowsWithDaysAreLeadingAndContiguous() {
         for fw in 1...7 {
             for y in 2025...2028 {
                 for m in 1...12 {
                     let g = grid(y, m, fw)
-                    XCTAssertTrue((4...6).contains(g.visibleRows))
-                    for row in 0..<g.visibleRows {
-                        XCTAssertTrue((0..<7).contains { g.isInMonth(index: row * 7 + $0) }, "\(y)-\(m) fw\(fw) row \(row)")
-                    }
+                    let n = dayRows(g)
+                    XCTAssertTrue((4...6).contains(n))
+                    // Days fill the first n rows; any later rows are wholly empty.
+                    for row in 0..<MonthGrid.rows { XCTAssertEqual(g.rowHasDays(row), row < n, "\(y)-\(m) fw\(fw) row \(row)") }
                     for i in 0..<42 { XCTAssertEqual(g.isInMonth(index: i), g.isInMonth(g.days[i])) }
                     XCTAssertEqual((0..<42).filter(g.isInMonth(index:)).count, g.month.numberOfDays)
                 }
             }
         }
+    }
+
+    func testWeekNumbersOnlyForRowsWithDays() {
+        // Sunday start: Feb 2026 has 4 weeks, Nov 5, Aug 6; Monday start: 5, 6, 6.
+        for (m, fw, rows) in [(2, 1, 4), (11, 1, 5), (8, 1, 6), (2, 2, 5), (11, 2, 6), (8, 2, 6)] {
+            let g = grid(2026, m, fw)
+            let numbers = g.weekNumbers()
+            XCTAssertEqual(numbers.count, rows, "2026-\(m) fw\(fw)")
+            XCTAssertEqual(numbers, (0..<rows).map { WeekNumber.of(g.days[$0 * 7], firstWeekday: fw) })
+        }
+        // Feb 2026, Sunday start: weeks 6–9; the empty fifth and sixth rows get no number.
+        XCTAssertEqual(grid(2026, 2, 1).weekNumbers(), [6, 7, 8, 9])
     }
 
     func testGridWeekNumbers() {
