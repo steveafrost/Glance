@@ -11,7 +11,7 @@ public struct GridGeometry: Equatable, Sendable {
     /// Week rows shown (a month's `visibleRows`).
     public var rows: Int
 
-    public init(cellWidth: CGFloat = 33, cellHeight: CGFloat = 28, headerHeight: CGFloat = 20,
+    public init(cellWidth: CGFloat = 33, cellHeight: CGFloat = 29, headerHeight: CGFloat = 20,
                 weekColumnWidth: CGFloat = 24, showsWeekNumbers: Bool = false, rows: Int = MonthGrid.rows) {
         self.rows = min(max(rows, 1), MonthGrid.rows)
         self.cellWidth = cellWidth

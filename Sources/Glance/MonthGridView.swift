@@ -85,49 +85,50 @@ final class MonthGridView: NSView {
             }
         }
 
-        let dayFont = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
-        let todayFont = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+        let dayFont = Self.dayFont, todayFont = Self.todayFont
         // Only the month's own days; out-of-month slots stay empty.
         for (i, day) in grid.days.enumerated() where grid.isInMonth(index: i) {
             let cell = g.cellRect(index: i)
             guard cell.intersects(dirtyRect) else { continue }
-            let pill = cell.insetBy(dx: 2, dy: 2)
+            let layout = DayCellLayout(cell: cell, font: Self.dayMetrics)
             let isToday = day == model.today
             if isToday {
                 colors.today.setFill()
-                NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
+                NSBezierPath(roundedRect: layout.pill, xRadius: radius, yRadius: radius).fill()
             } else if i == hovered {
                 colors.hover.setFill()
-                NSBezierPath(roundedRect: pill, xRadius: radius, yRadius: radius).fill()
+                NSBezierPath(roundedRect: layout.pill, xRadius: radius, yRadius: radius).fill()
             }
             if day == model.selected {
-                let ring = NSBezierPath(roundedRect: pill.insetBy(dx: 0.75, dy: 0.75), xRadius: radius - 0.75, yRadius: radius - 0.75)
-                ring.lineWidth = 1.5
+                let inset = DayCellLayout.ringWidth / 2
+                let ring = NSBezierPath(roundedRect: layout.ringPath, xRadius: radius - inset, yRadius: radius - inset)
+                ring.lineWidth = DayCellLayout.ringWidth
                 (isToday ? colors.onToday : colors.selection).setStroke()
                 ring.stroke()
             }
-            let textColor = isToday ? colors.onToday : colors.primaryText
-            var textRect = cell
-            textRect.origin.y -= 2
-            drawCentered(String(day.day), in: textRect, font: isToday ? todayFont : dayFont, color: textColor)
+            drawDay(String(day.day), x: cell.midX, top: layout.textTop, font: isToday ? todayFont : dayFont,
+                    color: isToday ? colors.onToday : colors.primaryText)
 
             if let dots = model.dots[day], !dots.isEmpty {
-                drawDots(dots, in: cell, override: isToday ? colors.onToday : nil)
+                for (rect, c) in zip(layout.dotRects(count: dots.count), dots) {
+                    (isToday ? colors.onToday : c).setFill()
+                    NSBezierPath(ovalIn: rect).fill()
+                }
             }
         }
     }
 
-    private func drawDots(_ dots: [NSColor], in cell: CGRect, override: NSColor?) {
-        let d: CGFloat = 4, spacing: CGFloat = 2
-        let shown = Array(dots.prefix(3))
-        let total = CGFloat(shown.count) * d + CGFloat(shown.count - 1) * spacing
-        var x = (cell.midX - total / 2).rounded()
-        let y = cell.maxY - 7
-        for c in shown {
-            (override ?? c).setFill()
-            NSBezierPath(ovalIn: CGRect(x: x, y: y, width: d, height: d)).fill()
-            x += d + spacing
-        }
+    static let dayFont = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .regular)
+    static let todayFont = NSFont.monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
+    static let dayMetrics: DayCellLayout.FontMetrics = {
+        let size = ("0" as NSString).size(withAttributes: [.font: dayFont])
+        return .init(lineHeight: size.height, ascender: dayFont.ascender, capHeight: dayFont.capHeight)
+    }()
+
+    private func drawDay(_ s: String, x: CGFloat, top: CGFloat, font: NSFont, color: NSColor) {
+        let attrs: [NSAttributedString.Key: Any] = [.font: font, .foregroundColor: color]
+        let w = (s as NSString).size(withAttributes: attrs).width
+        (s as NSString).draw(at: CGPoint(x: (x - w / 2).rounded(), y: top), withAttributes: attrs)
     }
 
     private func drawCentered(_ s: String, in rect: CGRect, font: NSFont, color: NSColor) {
