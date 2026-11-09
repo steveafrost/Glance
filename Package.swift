@@ -3,7 +3,7 @@ import PackageDescription
 
 let package = Package(
     name: "Glance",
-    platforms: [.macOS("15.0")],
+    platforms: [.macOS("27.0")],
     products: [
         .executable(name: "Glance", targets: ["Glance"]),
     ],
