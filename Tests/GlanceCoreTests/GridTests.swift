@@ -14,8 +14,8 @@ final class GridGeometryTests: XCTestCase {
     }
 
     func testSizeAccountsForWeekColumn() {
-        XCTAssertEqual(GridGeometry(showsWeekNumbers: false).size, CGSize(width: 210, height: 188))
-        XCTAssertEqual(GridGeometry(showsWeekNumbers: true).size.width, 234)
+        XCTAssertEqual(GridGeometry(showsWeekNumbers: false).size, CGSize(width: 231, height: 188))
+        XCTAssertEqual(GridGeometry(showsWeekNumbers: true).size.width, 255)
         XCTAssertNil(GridGeometry(showsWeekNumbers: false).weekNumberRect(row: 0))
     }
 }

@@ -9,7 +9,7 @@ public struct GridGeometry: Equatable, Sendable {
     public var weekColumnWidth: CGFloat
     public var showsWeekNumbers: Bool
 
-    public init(cellWidth: CGFloat = 30, cellHeight: CGFloat = 28, headerHeight: CGFloat = 20,
+    public init(cellWidth: CGFloat = 33, cellHeight: CGFloat = 28, headerHeight: CGFloat = 20,
                 weekColumnWidth: CGFloat = 24, showsWeekNumbers: Bool = false) {
         self.cellWidth = cellWidth
         self.cellHeight = cellHeight
