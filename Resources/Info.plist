@@ -46,6 +46,8 @@
     <string>mAqqD+TBv/3BULujwVHcfw3oCo8kOAhatC6IZ0J7XYo=</string>
     <key>SUEnableAutomaticChecks</key>
     <true/>
+    <key>SUEnableSystemProfiling</key>
+    <false/>
     <key>SUEnableInstallerLauncherService</key>
     <true/>
     <key>SUEnableDownloaderService</key>
