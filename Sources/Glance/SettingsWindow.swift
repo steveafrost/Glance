@@ -2,6 +2,11 @@ import AppKit
 import GlanceCore
 import SwiftUI
 
+/// Keeps the document pinned to the top while the window resizes.
+final class FlippedClipView: NSClipView {
+    override var isFlipped: Bool { true }
+}
+
 enum SettingsTab: String, CaseIterable, Identifiable {
     case general, appearance, calendars
     var id: String { rawValue }
@@ -28,14 +33,28 @@ enum SettingsTab: String, CaseIterable, Identifiable {
 final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate {
     static let contentWidth: CGFloat = 520
     private let state: SettingsState
+    private let host: NSHostingView<SettingsView>
+    private let scroll: NSScrollView
 
     init(model: CalendarModel) {
         state = SettingsState(model: model)
-        let host = NSHostingController(rootView: SettingsView(state: state))
+        let host = NSHostingView(rootView: SettingsView(state: state))
         host.sizingOptions = []
+        // An AppKit scroll view so a too-tall tab gets a real, always-visible
+        // scroller (SwiftUI's overlay scrollers hide until you scroll).
+        let scroll = NSScrollView()
+        scroll.contentView = FlippedClipView()
+        scroll.drawsBackground = false
+        scroll.hasVerticalScroller = true
+        scroll.autohidesScrollers = true
+        scroll.scrollerStyle = .legacy
+        scroll.automaticallyAdjustsContentInsets = true
+        scroll.documentView = host
         let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: Self.contentWidth, height: 400),
                               styleMask: [.titled, .closable, .fullSizeContentView], backing: .buffered, defer: true)
-        window.contentViewController = host
+        window.contentView = scroll
+        self.host = host
+        self.scroll = scroll
         // The title bar blends into the mantle background: no grey band.
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .preference
@@ -86,7 +105,7 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTo
     private func applyTheme() {
         guard let window else { return }
         window.appearance = ThemeColors.forcedAppearance
-        window.contentViewController?.view.appearance = ThemeColors.forcedAppearance
+        host.appearance = ThemeColors.forcedAppearance
         window.backgroundColor = state.palette.nsMantle
         refreshToolbarImages()
     }
@@ -140,11 +159,20 @@ final class SettingsWindowController: NSWindowController, NSWindowDelegate, NSTo
     private func fitWindow(animate: Bool) {
         guard let window, let natural = state.contentHeights[state.tab] else { return }
         let visible = (window.screen ?? NSScreen.main)?.visibleFrame ?? .zero
-        let fit = SettingsModel.contentHeight(natural: natural, available: visible.height - chromeHeight - 40)
+        var available = visible.height - chromeHeight - 40
+        // QA: -qaSettingsMaxHeight N pretends the screen is short.
+        let qaMax = UserDefaults.standard.double(forKey: "qaSettingsMaxHeight")
+        if qaMax > 0 { available = min(available, qaMax) }
+        let fit = SettingsModel.contentHeight(natural: natural, available: available)
         if state.scrolls != fit.scrolls { state.scrolls = fit.scrolls }
+        // The document is the tab at its natural height, narrower by the
+        // scroller when it scrolls.
+        let scrollerWidth = fit.scrolls ? NSScroller.scrollerWidth(for: .regular, scrollerStyle: .legacy) : 0
+        host.frame = CGRect(x: 0, y: 0, width: Self.contentWidth - scrollerWidth, height: ceil(natural))
         let height = fit.height + chromeHeight
         var frame = window.frame
         guard abs(frame.height - height) > 0.5 || abs(frame.width - Self.contentWidth) > 0.5 else { return }
+        if !fit.scrolls { scroll.contentView.scroll(to: .zero) }
         // Keep the top edge still, like System Settings.
         frame.origin.y = frame.maxY - height
         frame.size = CGSize(width: Self.contentWidth, height: height)
@@ -205,7 +233,8 @@ final class SettingsState: ObservableObject {
         launchAtLogin = LoginItem.isEnabled
         loginError = LoginItem.needsApproval
             ? "macOS needs your approval: turn on Glance in System Settings › General › Login Items & Extensions." : nil
-        accessGranted = model.access == .granted
+        // QA: --qa-no-access shows the access message.
+        accessGranted = model.access == .granted && !ProcessInfo.processInfo.arguments.contains("--qa-no-access")
         groups = model.calendarGroups
         selected = prefs.selectedCalendarIDs ?? Set(model.calendars.map(\.id))
         Task {
@@ -224,6 +253,12 @@ final class SettingsState: ObservableObject {
         if on { selected.insert(id) } else { selected.remove(id) }
         let all = Set(model.calendars.map(\.id))
         prefs.selectedCalendarIDs = selected == all ? nil : selected
+    }
+
+    func setAll(_ ids: [String], on: Bool) {
+        let r = SettingsModel.setAll(ids, on: on, selected: selected, allIDs: Set(model.calendars.map(\.id)))
+        selected = r.selected
+        prefs.selectedCalendarIDs = r.stored
     }
 
     func binding<T>(_ keyPath: ReferenceWritableKeyPath<Preferences, T>) -> Binding<T> {
@@ -267,19 +302,16 @@ struct SettingsView: View {
     @ObservedObject var state: SettingsState
 
     var body: some View {
-        ScrollView(.vertical) {
-            content
-                .padding(.horizontal, 20)
-                .padding(.top, 16)
-                .padding(.bottom, 20)
-                .frame(width: SettingsWindowController.contentWidth, alignment: .top)
-                .fixedSize(horizontal: false, vertical: true)
-                .background(GeometryReader { g in
-                    Color.clear.preference(key: ContentHeightKey.self, value: g.size.height)
-                })
-        }
-        .scrollIndicators(state.scrolls ? .visible : .never)
-        .scrollDisabled(!state.scrolls)
+        content
+            .padding(.horizontal, 20)
+            .padding(.top, 16)
+            .padding(.bottom, 20)
+            .frame(width: SettingsWindowController.contentWidth - (state.scrolls ? 15 : 0), alignment: .top)
+            .fixedSize(horizontal: false, vertical: true)
+            .background(GeometryReader { g in
+                Color.clear.preference(key: ContentHeightKey.self, value: g.size.height)
+            })
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .onPreferenceChange(ContentHeightKey.self) { h in
             MainActor.assumeIsolated { state.reportHeight(h, for: state.tab) }
         }
@@ -572,38 +604,70 @@ private struct DayChip: View {
 
 private struct CalendarSettings: View {
     @ObservedObject var state: SettingsState
+    @Environment(\.palette) private var p
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: 18) {
             if !state.accessGranted {
-                Text("Glance doesn’t have access to your calendars. Turn on Full Access for Glance in System Settings › Privacy & Security › Calendars.")
-                    .foregroundStyle(.secondary)
-                Button("Open Privacy Settings") {
-                    if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
-                        NSWorkspace.shared.open(url)
+                SettingsSection {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Image(systemName: "lock.fill").foregroundStyle(p.accent)
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Glance can’t see your calendars").font(.system(size: 13, weight: .semibold))
+                                Text("Turn on Full Access for Glance in System Settings › Privacy & Security › Calendars, then come back here.")
+                                    .font(.system(size: 12)).foregroundStyle(p.subtext0).fixedSize(horizontal: false, vertical: true)
+                            }
+                        }
+                        HStack {
+                            Spacer()
+                            AccentButton(title: "Open Privacy Settings") {
+                                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Calendars") {
+                                    NSWorkspace.shared.open(url)
+                                }
+                            }
+                        }
                     }
+                    .padding(12)
                 }
             } else if state.groups.isEmpty {
-                Text("No calendars found. Add an account in Calendar.app or System Settings › Internet Accounts.")
-                    .foregroundStyle(.secondary)
+                SettingsSection {
+                    SettingsNote(text: "No calendars found. Add an account in Calendar or System Settings › Internet Accounts.",
+                                 symbol: "calendar.badge.exclamationmark")
+                }
             }
             ForEach(state.groups, id: \.title) { group in
-                Section(group.title) {
-                    ForEach(group.calendars) { cal in
-                        Toggle(isOn: Binding(get: { state.selected.contains(cal.id) },
-                                             set: { state.setCalendar(cal.id, on: $0) })) {
-                            HStack(spacing: 6) {
-                                RoundedRectangle(cornerRadius: 3)
-                                    .fill(Color(nsColor: NSColor(rgba: cal.color)))
-                                    .frame(width: 10, height: 10)
-                                Text(cal.title)
+                let ids = group.calendars.map(\.id)
+                let allShown = SettingsModel.allShown(ids, selected: state.selected)
+                VStack(alignment: .leading, spacing: 6) {
+                    HStack {
+                        Text(group.title).font(.system(size: 11, weight: .semibold)).foregroundStyle(p.overlay0)
+                        Spacer()
+                        AccentLink(title: allShown ? "Hide all" : "Show all") { state.setAll(ids, on: !allShown) }
+                    }
+                    .padding(.horizontal, 12)
+                    SettingsCard {
+                        ForEach(group.calendars) { cal in
+                            HStack(spacing: 10) {
+                                Circle().fill(Color(nsColor: NSColor(rgba: cal.color))).frame(width: 10, height: 10)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(cal.title).font(.system(size: 13)).foregroundStyle(p.text).lineLimit(1)
+                                    if !cal.allowsModifications {
+                                        Text("Read-only").font(.system(size: 11)).foregroundStyle(p.subtext0)
+                                    }
+                                }
+                                Spacer(minLength: 8)
+                                ThemedSwitch(isOn: Binding(get: { state.selected.contains(cal.id) },
+                                                           set: { state.setCalendar(cal.id, on: $0) }))
                             }
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 9)
+                            .frame(minHeight: 40)
                         }
                     }
                 }
             }
         }
-
     }
 }
 
