@@ -16,7 +16,7 @@ app is built against the macOS 27 SDK and uses APIs from it.
 
 Website: **[glancecalendar.app](https://glancecalendar.app)**
 
-[![Buy me a coffee](https://img.shields.io/badge/buy%20me%20a%20coffee-steveafrost-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/steveafrost)
+[![Buy me a coffee](https://img.shields.io/badge/buy%20me%20a%20coffee-stevefrost-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/stevefrost)
 
 ## Screenshots
 
@@ -211,4 +211,4 @@ Colours are from the [Catppuccin](https://catppuccin.com) palette (MIT).
 
 Glance is free and MIT-licensed, with no subscription and no pro tier. If it
 earns a place in your menu bar, you can
-[buy me a coffee](https://buymeacoffee.com/steveafrost).
+[buy me a coffee](https://buymeacoffee.com/stevefrost).
