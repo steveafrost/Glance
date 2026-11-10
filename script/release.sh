@@ -61,10 +61,18 @@ publish() {
   source "$DIST/manifest.env"
   xcrun stapler validate "$DIST/Glance.app" >/dev/null || die "$DIST/Glance.app has no stapled ticket"
   [[ -x $SPARKLE_BIN/generate_appcast ]] || die "Sparkle tools missing; run: swift package resolve"
-  "$SPARKLE_BIN/generate_keys" -p >/dev/null 2>&1 \
-    || die "no Sparkle EdDSA key in this Mac's keychain. Import the backup: $SPARKLE_BIN/generate_keys -f <file>"
-  [[ $("$SPARKLE_BIN/generate_keys" -p) == $(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$DIST/Glance.app/Contents/Info.plist") ]] \
-    || die "the keychain's EdDSA key doesn't match SUPublicEDKey in the app"
+  # Prefer a key file: reading the key from the keychain makes the Sparkle
+  # tools raise a GUI authorisation prompt, which blocks any unattended run.
+  local edkey=${GLANCE_ED_KEY_FILE:-$HOME/.appstoreconnect/sparkle/glance-ed25519.key}
+  local -a edkey_opt=()
+  if [[ -f $edkey ]]; then
+    edkey_opt=(--ed-key-file "$edkey")
+  else
+    "$SPARKLE_BIN/generate_keys" -p >/dev/null 2>&1 \
+      || die "no Sparkle EdDSA key in this Mac's keychain. Import the backup: $SPARKLE_BIN/generate_keys -f <file>"
+    [[ $("$SPARKLE_BIN/generate_keys" -p) == $(/usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$DIST/Glance.app/Contents/Info.plist") ]] \
+      || die "the keychain's EdDSA key doesn't match SUPublicEDKey in the app"
+  fi
   gh auth status >/dev/null 2>&1 || die "gh isn't signed in"
   [[ $(gh repo view $REPO --json visibility -q .visibility) == PUBLIC ]] \
     || die "$REPO is private; the update feed must be public"
@@ -78,12 +86,12 @@ publish() {
   cp "$DIST/$ZIP" "$DIST/Glance-$VERSION.md" "$feed/"
   "$SPARKLE_BIN/generate_appcast" --embed-release-notes \
     --download-url-prefix "https://github.com/$REPO/releases/download/v$VERSION/" \
-    --link "https://github.com/$REPO" "$feed"
+    --link "https://github.com/$REPO" "${edkey_opt[@]}" "$feed"
   grep -q "releases/download/v$VERSION/$ZIP" "$feed/appcast.xml" || die "appcast has no item for $ZIP"
   # Check the new item's EdDSA signature against the archive.
   local sig
   sig=$(grep -A6 "v$VERSION/$ZIP" "$feed/appcast.xml" | grep -o 'sparkle:edSignature="[^"]*"' | head -1 | cut -d'"' -f2)
-  "$SPARKLE_BIN/sign_update" --verify "$feed/$ZIP" "$sig" || die "EdDSA signature check failed"
+  "$SPARKLE_BIN/sign_update" "${edkey_opt[@]}" --verify "$feed/$ZIP" "$sig" || die "EdDSA signature check failed"
 
   gh release create "v$VERSION" --repo $REPO --target "$COMMIT" --title "Glance $VERSION" \
     --notes-file "$DIST/Glance-$VERSION.md" "$DIST/$ZIP" "$feed/appcast.xml"
