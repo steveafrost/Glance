@@ -1,6 +1,7 @@
 # Glance
 
-![Glance's month grid in the Mocha theme](docs/hero.png)
+![Glance's calendar popover in the Mocha theme: a month grid above an agenda
+for the selected day](docs/popover-mocha.png)
 
 A small native macOS menu bar calendar: today's date in the menu bar, a
 month grid and agenda under it, Catppuccin themes, meeting join links and
@@ -75,7 +76,14 @@ anywhere).
 script/test.sh                 # swift test
 script/build-app.sh            # build/Glance.app
 script/build-app.sh --install  # replace /Applications/Glance.app and launch it
+script/popover-shot.sh out.png # docs screenshot, no screen recording needed
 ```
+
+The screenshots in this README are rendered by the app itself:
+`--qa-keys dump-popover` draws the popover into a bitmap instead of reading
+the screen, and `--qa-demo-data` swaps EventKit for an invented calendar, so
+no personal data is involved and the command works on a Mac with no calendar
+account. Both flags are QA-only and inert unless passed.
 
 `build-app.sh` signs with the first "Apple Development" identity in the
 keychain (override with `GLANCE_SIGN_IDENTITY`, or `-` for ad-hoc). A stable
