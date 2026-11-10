@@ -1,8 +1,8 @@
 # Glance
 
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="docs/popover-mocha.png">
-  <img alt="Glance's calendar popover: a month grid above an agenda for the selected day" src="docs/popover-latte.png" width="271">
+  <source media="(prefers-color-scheme: dark)" srcset="docs/banner-mocha.png">
+  <img alt="Glance banner: the app icon beside the word Glance and the line 'A calendar that lives where you already look', next to three windows — the settings pane, the calendar popover with a March 2026 month grid over an agenda, and an event editor." src="docs/banner-latte.png" width="880">
 </picture>
 
 A small native macOS menu bar calendar: today's date in the menu bar, a
