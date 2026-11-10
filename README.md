@@ -1,10 +1,15 @@
 # Glance
 
+![Glance's month grid in the Mocha theme](docs/hero.png)
+
 A small native macOS menu bar calendar: today's date in the menu bar, a
 month grid and agenda under it, Catppuccin themes, meeting join links and
 event editing. Swift 6 (strict concurrency) and AppKit, EventKit for data.
 The only third-party code is [Sparkle](https://sparkle-project.org) for
-updates. Requires macOS 27.
+updates.
+
+Requires **macOS 27** or later. There is no build for older releases; the
+app is built against the macOS 27 SDK and uses APIs from it.
 
 ## Install
 
