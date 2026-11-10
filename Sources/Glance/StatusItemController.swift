@@ -145,8 +145,9 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         // unless the bar auto-hides, in which case trust the status bar thickness.
         let reserved = screen.frame.maxY - screen.visibleFrame.maxY
         let barHeight = reserved >= 20 ? reserved : max(thickness, window.frame.height)
-        // macOS 27 makes status item windows taller than the bar and lets the
-        // button poke above the screen's top edge, so buttonTop can be negative.
+        // Recent macOS versions make status item windows taller than the bar and
+        // let the button poke above the screen's top edge, so buttonTop can be
+        // negative. Nothing here assumes a particular bar thickness.
         let buttonTop = screen.frame.maxY - buttonInScreen.maxY
         guard button.bounds.height > 0, buttonTop > -button.bounds.height / 2, buttonTop < barHeight else {
             return .fullBar(barHeight, scale: window.backingScaleFactor)

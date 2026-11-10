@@ -3,9 +3,9 @@ import Foundation
 
 /// Geometry for the menu bar date icon.
 ///
-/// The status bar button centres a short image inside its own frame, and on
-/// macOS 27's 30pt menu bar that frame isn't centred in the bar, which is why
-/// a plain 16pt image lands one point high. Instead, the canvas is as tall
+/// The status bar button centres a short image inside its own frame, and that
+/// frame isn't always centred in the bar, which is why a plain 16pt image can
+/// land a point high. Instead, the canvas is as tall
 /// as the button and the box is placed in *bar* coordinates, so it sits
 /// exactly where we want however the button is positioned.
 ///
@@ -27,7 +27,7 @@ public struct IconLayout: Equatable, Sendable {
 
     /// Where the status button sits within the menu bar.
     public struct Placement: Equatable, Sendable {
-        /// Menu bar thickness (30 on macOS 27 notch-less displays).
+        /// Menu bar thickness, measured at runtime (30 on a notch-less bar).
         public var barHeight: CGFloat
         /// The button's height.
         public var buttonHeight: CGFloat

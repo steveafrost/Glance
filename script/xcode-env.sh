@@ -3,10 +3,10 @@
 # Source this from a script that has already cd'd to the repo root.
 #
 # Order: $DEVELOPER_DIR if set, else the newest /Applications/Xcode*.app,
-# else whatever xcode-select points at. Glance's package targets macOS 27, so
-# an older Xcode still fails to build — but with its own version error instead
-# of a missing-path error. Named Xcode-<version>.app installs are the reason
-# this can't just be /Applications/Xcode.app.
+# else whatever xcode-select points at. Glance's package needs the macOS 26
+# SDK, so an older Xcode still fails to build — but with its own version error
+# instead of a missing-path error. Named Xcode-<version>.app installs are the
+# reason this can't just be /Applications/Xcode.app.
 
 glance_developer_dir() {
   if [[ -n ${DEVELOPER_DIR:-} ]]; then

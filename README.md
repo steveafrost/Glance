@@ -11,8 +11,8 @@ event editing. Swift 6 (strict concurrency) and AppKit, EventKit for data.
 The only third-party code is [Sparkle](https://sparkle-project.org) for
 updates.
 
-Requires **macOS 27** or later. There is no build for older releases; the
-app is built against the macOS 27 SDK and uses APIs from it.
+Requires **macOS 26** or later — the current release and the one before it.
+There is no build for older releases.
 
 Website: **[glancecalendar.app](https://glancecalendar.app)**
 
@@ -55,9 +55,9 @@ Check for Updates… in the ⋯ menu or the icon's right-click menu.
 
 ## Features
 
-- **Menu bar date icon** drawn as a template image and placed in menu bar
-  coordinates, so the box is centred on macOS 27's 30pt bar (rows 7–22)
-  instead of sitting a point high. Outline or filled style.
+- **Menu bar date icon** drawn as a template image and placed in real menu bar
+  coordinates, so the box is centred in the bar instead of sitting a point
+  high. Outline or filled style.
 - **Clock text** next to the icon from any Unicode date pattern
   (`EEE h:mm a`, `HH:mm:ss`…). The item keeps a fixed width so nothing
   jitters; the icon can be hidden.
