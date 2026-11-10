@@ -19,6 +19,14 @@ final class CalendarModel {
     /// Called on the main actor whenever events or calendars change.
     var onChange: (() -> Void)?
 
+    /// QA only: when non-empty, only calendars with these titles are shown, so
+    /// screenshots contain no personal data. Set from `--qa-only-calendars`.
+    var qaOnlyCalendarTitles: Set<String> = []
+
+    /// QA only: serve invented events instead of EventKit (`--qa-demo-data`), so
+    /// screenshots work on a machine with no calendar account.
+    var qaDemoData = false
+
     var calendar: Calendar {
         var c = Calendar(identifier: .gregorian)
         c.timeZone = .autoupdatingCurrent
@@ -35,6 +43,15 @@ final class CalendarModel {
 
     func start() async {
         let args = ProcessInfo.processInfo.arguments
+        if args.contains("--qa-demo-data") {
+            // QA: invented calendars and events, no EventKit and no permission.
+            qaDemoData = true
+            calendars = DemoData.calendars
+            access = .granted
+            onChange?()
+            fetchMissing()
+            return
+        }
         if let i = args.firstIndex(of: "--qa-access"), i + 1 < args.count {
             // QA: show an access state without touching the real permission.
             switch args[i + 1] {
@@ -109,9 +126,18 @@ final class CalendarModel {
         let ids = Preferences.shared.selectedCalendarIDs
         let cal = calendar
         let repo = repository
+        let onlyTitles = qaOnlyCalendarTitles
+        let demo = qaDemoData
         Task {
             for month in missing {
-                let events = await repo.events(in: month, calendarIDs: ids, calendar: cal)
+                var effective = ids
+                if !onlyTitles.isEmpty {
+                    effective = Set(calendars.filter { onlyTitles.contains($0.title) }.map(\.id))
+                    if effective?.isEmpty == true { effective = [] }
+                }
+                let events = demo
+                    ? DemoData.events(in: month, calendarIDs: effective, calendar: cal)
+                    : await repo.events(in: month, calendarIDs: effective, calendar: cal)
                 self.cache.store(events, for: month, generation: generation)
             }
             self.onChange?()

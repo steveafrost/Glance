@@ -92,6 +92,15 @@ final class AppController: NSObject, NSWindowDelegate {
                 month = selected.monthKey
             }
         }
+        if let flagIndex = args.firstIndex(of: "--qa-only-calendars"), flagIndex + 1 < args.count {
+            // QA: show only calendars whose title matches this comma-separated
+            // list, so screenshots for the README contain no personal data.
+            // Overrides the saved selection for this launch only.
+            model.qaOnlyCalendarTitles = Set(
+                args[flagIndex + 1].split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+                    .filter { !$0.isEmpty }
+            )
+        }
         // First run (calendar permission never asked): open the calendar
         // under the icon so a new user sees where Glance lives, next to the
         // permission prompt.
@@ -131,6 +140,17 @@ final class AppController: NSObject, NSWindowDelegate {
                     log.notice("qa dump-grid \(self.content.grid.model.grid.month.description, privacy: .public)")
                 }
                 delay += 0.5
+                continue
+            }
+            if key == "dump-popover" {
+                // Render the whole popover offscreen. Needs no Screen Recording
+                // permission; with --qa-demo-data it also needs no calendar data.
+                let outPath = ProcessInfo.processInfo.environment["GLANCE_QA_OUT"]
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+                    guard let self else { return }
+                    self.content.publishPopoverDump(background: self.colors.background, path: outPath)
+                }
+                delay += 1.0
                 continue
             }
             if key == "edit-first" {
