@@ -1,7 +1,9 @@
 # Glance
 
-![Glance's calendar popover in the Mocha theme: a month grid above an agenda
-for the selected day](docs/popover-mocha.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/popover-mocha.png">
+  <img alt="Glance's calendar popover: a month grid above an agenda for the selected day" src="docs/popover-latte.png" width="271">
+</picture>
 
 A small native macOS menu bar calendar: today's date in the menu bar, a
 month grid and agenda under it, Catppuccin themes, meeting join links and
@@ -11,6 +13,23 @@ updates.
 
 Requires **macOS 27** or later. There is no build for older releases; the
 app is built against the macOS 27 SDK and uses APIs from it.
+
+Website: **[glancecalendar.app](https://glancecalendar.app)**
+
+[![Buy me a coffee](https://img.shields.io/badge/buy%20me%20a%20coffee-steveafrost-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/steveafrost)
+
+## Screenshots
+
+Both themes are shown: GitHub picks the one matching your light or dark
+setting.
+
+| | |
+|---|---|
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/settings-general-mocha.png"><img alt="Settings, General tab" src="docs/settings-general-latte.png" width="380"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/settings-appearance-mocha.png"><img alt="Settings, Appearance tab: the four Catppuccin flavours" src="docs/settings-appearance-latte.png" width="380"></picture> |
+| <picture><source media="(prefers-color-scheme: dark)" srcset="docs/settings-calendars-mocha.png"><img alt="Settings, Calendars tab: calendars grouped by account" src="docs/settings-calendars-latte.png" width="380"></picture> | <picture><source media="(prefers-color-scheme: dark)" srcset="docs/editor-mocha.png"><img alt="The event editor" src="docs/editor-latte.png" width="380"></picture> |
+
+These are drawn by the app itself, not captured from a screen — see
+[Building](#building). The calendars in them are invented.
 
 ## Install
 
@@ -76,14 +95,16 @@ anywhere).
 script/test.sh                 # swift test
 script/build-app.sh            # build/Glance.app
 script/build-app.sh --install  # replace /Applications/Glance.app and launch it
-script/popover-shot.sh out.png # docs screenshot, no screen recording needed
+script/docs-shots.sh           # every docs screenshot, both themes
 ```
 
 The screenshots in this README are rendered by the app itself:
-`--qa-keys dump-popover` draws the popover into a bitmap instead of reading
-the screen, and `--qa-demo-data` swaps EventKit for an invented calendar, so
-no personal data is involved and the command works on a Mac with no calendar
-account. Both flags are QA-only and inert unless passed.
+`--qa-keys dump-popover`, `dump-settings` and `dump-editor` draw each window
+into a bitmap instead of reading the screen, and `--qa-demo-data` swaps
+EventKit for an invented calendar, so no personal data is involved and the
+command works on a Mac with no calendar account. The flags are QA-only and
+inert unless passed. `script/docs-shots.sh` drives all of them in Mocha and
+Latte and writes the ten PNGs in `docs/`.
 
 `build-app.sh` signs with the first "Apple Development" identity in the
 keychain (override with `GLANCE_SIGN_IDENTITY`, or `-` for ad-hoc). A stable
@@ -185,3 +206,9 @@ Glance is a from-scratch rewrite whose behaviour is modelled on
 [Itsycal](https://www.mowglii.com/itsycal/) by Sanjay Madan (MIT), via
 Steve's Catppuccin fork. No Itsycal code is included; see [LICENSE](LICENSE).
 Colours are from the [Catppuccin](https://catppuccin.com) palette (MIT).
+
+## Support
+
+Glance is free and MIT-licensed, with no subscription and no pro tier. If it
+earns a place in your menu bar, you can
+[buy me a coffee](https://buymeacoffee.com/steveafrost).

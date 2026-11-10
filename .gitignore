@@ -4,3 +4,7 @@ dist/
 *.xcodeproj/
 .swiftpm/
 .DS_Store
+
+# marketing site (Vercel CLI local state)
+site/.vercel/
+site/.env*

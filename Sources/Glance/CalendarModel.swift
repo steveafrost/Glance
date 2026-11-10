@@ -170,7 +170,10 @@ final class CalendarModel {
     }
 
     func reloadCalendars() async {
-        guard access == .granted else { return }
+        // Demo calendars are invented and not in the store, so asking EventKit
+        // would replace them with an empty list (and Settings would say "No
+        // calendars found").
+        guard access == .granted, !qaDemoData else { return }
         calendars = await repository.calendars()
     }
 

@@ -1,0 +1,350 @@
+<!doctype html>
+<html lang="en" data-flavor="mocha">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Glance — a calendar in your menu bar</title>
+<meta name="description" content="A small native macOS menu bar calendar. Catppuccin themes, meeting join links, event editing. No account, no network access.">
+<meta name="theme-color" content="#1e1e2e">
+<link rel="canonical" href="https://glancecalendar.app/">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://glancecalendar.app/">
+<meta property="og:title" content="Glance — a calendar in your menu bar">
+<meta property="og:description" content="A small native macOS menu bar calendar. Catppuccin themes, meeting join links, event editing. No account, no network access.">
+<meta property="og:image" content="https://glancecalendar.app/img/popover-mocha.png">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='26' height='24' rx='6' fill='%23cba6f7'/%3E%3Crect x='3' y='5' width='26' height='8' rx='6' fill='%23b4befe'/%3E%3Ccircle cx='11' cy='20' r='2.4' fill='%231e1e2e'/%3E%3Ccircle cx='21' cy='20' r='2.4' fill='%231e1e2e' opacity='.55'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<nav class="bar">
+  <span class="wordmark">Glance</span>
+  <div class="flavors" role="group" aria-label="Catppuccin flavour">
+    <button type="button" data-set="latte" title="Latte" aria-label="Latte"><i style="--sw:#eff1f5"></i></button>
+    <button type="button" data-set="frappe" title="Frappé" aria-label="Frappé"><i style="--sw:#303446"></i></button>
+    <button type="button" data-set="macchiato" title="Macchiato" aria-label="Macchiato"><i style="--sw:#24273a"></i></button>
+    <button type="button" data-set="mocha" title="Mocha" aria-label="Mocha"><i style="--sw:#1e1e2e"></i></button>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="hero-copy">
+    <h1>A calendar that lives<br><em>where you already look.</em></h1>
+    <p class="lede">
+      Glance puts today's date in your menu bar. Click it and a month grid and
+      agenda drop down underneath — your events, your meeting links, in four
+      Catppuccin flavours.
+    </p>
+    <div class="actions">
+      <a class="btn primary" href="https://github.com/steveafrost/Glance/releases/latest/download/Glance-1.0.1.zip">
+        Download for macOS
+        <span class="btn-meta">1.0.1 · 1.9 MB</span>
+      </a>
+      <a class="btn ghost" href="https://github.com/steveafrost/Glance">Source on GitHub</a>
+    </div>
+    <p class="fineprint">
+      Requires macOS 27 or later. Signed with a Developer ID, notarized by Apple,
+      and it updates itself.
+    </p>
+  </div>
+
+  <figure class="hero-shot">
+    <div class="shot-frame">
+      <img id="hero-img" src="img/popover-mocha.png" width="271" height="546"
+           alt="The Glance popover: a March 2026 month grid with coloured event dots, above an agenda listing Standup, Write release notes and Coffee with Sam on Monday 9 March.">
+    </div>
+    <figcaption>The real popover. Events shown are invented.</figcaption>
+  </figure>
+</header>
+
+<main>
+
+<section class="strip" aria-label="What it does">
+  <div class="strip-item">
+    <span class="strip-label">Reads</span>
+    <span class="strip-value">EventKit — the calendars already on your Mac</span>
+  </div>
+  <div class="strip-item">
+    <span class="strip-label">Network</span>
+    <span class="strip-value">None. No outgoing-connection entitlement</span>
+  </div>
+  <div class="strip-item">
+    <span class="strip-label">Accounts</span>
+    <span class="strip-value">No sign-in, no telemetry</span>
+  </div>
+  <div class="strip-item">
+    <span class="strip-label">Built with</span>
+    <span class="strip-value">Swift 6, AppKit, one dependency</span>
+  </div>
+</section>
+
+<section class="features">
+  <h2>Small app, sharp edges filed off</h2>
+
+  <div class="grid">
+    <article>
+      <h3>A menu bar date you can read at a glance</h3>
+      <p>
+        Drawn as a template image and placed in real menu bar coordinates, so the
+        box is centred on macOS 27's 30&nbsp;pt bar instead of sitting a point
+        high. Outline or filled.
+      </p>
+    </article>
+
+    <article>
+      <h3>Meetings become one click</h3>
+      <p>
+        Zoom, Meet, Teams and Webex links are found in an event's location, URL or
+        notes. The agenda grows a join button that opens the native app when you
+        have it, and a camera appears in the menu bar while a call is current or
+        about to start. ⌘J joins.
+      </p>
+    </article>
+
+    <article>
+      <h3>Four flavours, plus the system's own</h3>
+      <p>
+        Latte, Frappé, Macchiato and Mocha from the
+        <a href="https://catppuccin.com">Catppuccin</a> palette, a Catppuccin
+        auto mode that follows light and dark, or plain macOS colours.
+      </p>
+    </article>
+
+    <article>
+      <h3>Actually edits events</h3>
+      <p>
+        Create, change and delete. Deleting a repeating event asks whether you
+        mean this one or all future ones. Declined events stay hidden.
+      </p>
+    </article>
+
+    <article>
+      <h3>Keyboard first, mouse welcome</h3>
+      <p>
+        Arrows move by month and year, <kbd>⇧</kbd>+arrows or <kbd>h</kbd>
+        <kbd>j</kbd> <kbd>k</kbd> <kbd>l</kbd> move the selection,
+        <kbd>t</kbd> jumps to today, <kbd>return</kbd> makes an event. Or
+        two-finger swipe the grid.
+      </p>
+    </article>
+
+    <article>
+      <h3>Honest about updates</h3>
+      <p>
+        Checks once a day. When one is waiting the menu item says so and the icon
+        gets a dot, rather than throwing a window in front of your work.
+      </p>
+    </article>
+  </div>
+</section>
+
+<section class="gallery">
+  <h2>Look around</h2>
+  <p class="section-lede">
+    These are drawn by the app itself, not captured from a screen — same code
+    path as the window you'd see. Switch the flavour up top and they change with
+    it.
+  </p>
+
+  <div class="shots">
+    <figure>
+      <img class="shot" data-latte="img/settings-general-latte.png" data-dark="img/settings-general-mocha.png"
+           src="img/settings-general-mocha.png" width="380"
+           alt="Settings, General tab: open at login, the show-or-hide shortcut, update checks, menu bar icon style, clock format, meeting indicator and agenda length.">
+      <figcaption>General</figcaption>
+    </figure>
+    <figure>
+      <img class="shot" data-latte="img/settings-appearance-latte.png" data-dark="img/settings-appearance-mocha.png"
+           src="img/settings-appearance-mocha.png" width="380"
+           alt="Settings, Appearance tab: the four Catppuccin flavours as previews, with options to match macOS appearance or use system colours, then week start and highlighted days.">
+      <figcaption>Appearance</figcaption>
+    </figure>
+    <figure>
+      <img class="shot" data-latte="img/settings-calendars-latte.png" data-dark="img/settings-calendars-mocha.png"
+           src="img/settings-calendars-mocha.png" width="380"
+           alt="Settings, Calendars tab: calendars grouped by account, each with a colour dot and a switch.">
+      <figcaption>Calendars</figcaption>
+    </figure>
+    <figure>
+      <img class="shot" data-latte="img/editor-latte.png" data-dark="img/editor-mocha.png"
+           src="img/editor-mocha.png" width="380"
+           alt="The event editor: title, all-day, start and end, calendar picker, location, URL and notes, with Delete, Cancel and Save.">
+      <figcaption>The editor</figcaption>
+    </figure>
+  </div>
+</section>
+
+<section class="privacy">
+  <div class="privacy-copy">
+    <h2>It cannot phone home, because it has no network</h2>
+    <p>
+      Glance reads your calendars through macOS and nothing else. It's sandboxed
+      without the outgoing-connections entitlement, so there is no code path that
+      could send anything anywhere.
+    </p>
+    <p>
+      Updates are the one exception, and they don't run inside the app: Sparkle's
+      separate Downloader service fetches the update feed and archive from this
+      project's GitHub Releases, with system profiling off. It learns nothing
+      about you.
+    </p>
+    <p class="muted">
+      <code>script/check-offline.sh</code> and the offline guard tests fail the
+      build if that ever changes.
+    </p>
+  </div>
+  <div class="privacy-code">
+    <span class="code-label">Glance.entitlements</span>
+<pre><code><span class="c">&lt;!-- the only one --&gt;</span>
+&lt;key&gt;com.apple.security.personal-information.calendars&lt;/key&gt;
+&lt;true/&gt;
+
+<span class="c">&lt;!-- no com.apple.security.network.client --&gt;</span></code></pre>
+  </div>
+</section>
+
+<section class="support">
+  <div class="support-inner">
+    <div>
+      <h2>Glance is free and MIT-licensed</h2>
+      <p>
+        No subscription, no upsell, no "pro". If it earns a place in your menu
+        bar and you feel like it, you can buy me a coffee.
+      </p>
+    </div>
+    <a class="bmc" href="https://buymeacoffee.com/steveafrost">
+      <span class="bmc-icon" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 8h12v6a5 5 0 0 1-5 5H9a5 5 0 0 1-5-5V8Z"/>
+          <path d="M16 9h1.8a2.7 2.7 0 0 1 0 5.4H16"/>
+          <path d="M7 4.5c0 .8.9.9.9 1.7M10.5 4c0 .8.9.9.9 1.7M14 4.5c0 .8.9.9.9 1.7"/>
+        </svg>
+      </span>
+      Buy me a coffee
+    </a>
+  </div>
+</section>
+
+<section class="faq">
+  <h2>Reasonable questions</h2>
+  <details>
+    <summary>Does it replace the Calendar app?</summary>
+    <p>
+      No. It reads the same calendars through EventKit, so anything you change in
+      one shows up in the other. It's a faster way to look at the next week and
+      join the next call, not a replacement for a full calendar.
+    </p>
+  </details>
+  <details>
+    <summary>Why macOS 27 only?</summary>
+    <p>
+      It's built against the macOS 27 SDK and uses APIs from it, including the
+      30&nbsp;pt menu bar geometry that the icon is positioned for. There's no
+      build for earlier releases rather than a build that looks slightly wrong.
+    </p>
+  </details>
+  <details>
+    <summary>Is it really offline?</summary>
+    <p>
+      Yes. The app has no network entitlement, so it has no way to make a
+      connection even if it wanted to. The build fails if that changes.
+    </p>
+  </details>
+  <details>
+    <summary>What happens if I stop paying for the domain?</summary>
+    <p>
+      Nothing. The app is on GitHub Releases and updates come from there, so the
+      domain is only this page.
+    </p>
+  </details>
+  <details>
+    <summary>How do I uninstall it?</summary>
+    <p>
+      Quit it, drag it to the Trash, and turn off Open at login first if you
+      enabled it. There's no helper process left behind.
+    </p>
+  </details>
+</section>
+
+</main>
+
+<footer>
+  <span>Glance — MIT © 2026 Steve Frost</span>
+  <nav>
+    <a href="https://github.com/steveafrost/Glance">GitHub</a>
+    <a href="https://github.com/steveafrost/Glance/releases">Releases</a>
+    <a href="https://github.com/steveafrost/Glance/blob/main/LICENSE">License</a>
+    <a href="https://buymeacoffee.com/steveafrost">Buy me a coffee</a>
+  </nav>
+  <span class="credits">
+    Behaviour modelled on <a href="https://www.mowglii.com/itsycal/">Itsycal</a>
+    by Sanjay Madan. Colours from <a href="https://catppuccin.com">Catppuccin</a>.
+  </span>
+</footer>
+
+<script>
+// Catppuccin flavours, straight from Sources/GlanceCore/Palette.swift so the
+// page cannot drift from the app.
+const FLAVORS = {
+  latte:     { dark:false, base:'#eff1f5', mantle:'#e6e9ef', crust:'#dce0e8', surface0:'#ccd0da',
+               surface1:'#bcc0cc', text:'#4c4f69', subtext0:'#6c6f85', subtext1:'#5c5f77', overlay0:'#9ca0b0',
+               mauve:'#8839ef', blue:'#1e66f5', green:'#40a02b', peach:'#fe640b', teal:'#179299' },
+  frappe:    { dark:true,  base:'#303446', mantle:'#292c3c', crust:'#232634', surface0:'#414559',
+               surface1:'#51576d', text:'#c6d0f5', subtext0:'#a5adce', subtext1:'#b5bfe2', overlay0:'#737994',
+               mauve:'#ca9ee6', blue:'#8caaee', green:'#a6d189', peach:'#ef9f76', teal:'#81c8be' },
+  macchiato: { dark:true,  base:'#24273a', mantle:'#1e2030', crust:'#181926', surface0:'#363a4f',
+               surface1:'#494d64', text:'#cad3f5', subtext0:'#a5adcb', subtext1:'#b8c0e0', overlay0:'#6e738d',
+               mauve:'#c6a0f6', blue:'#8aadf4', green:'#a6da95', peach:'#f5a97f', teal:'#8bd5ca' },
+  mocha:     { dark:true,  base:'#1e1e2e', mantle:'#181825', crust:'#11111b', surface0:'#313244',
+               surface1:'#45475a', text:'#cdd6f4', subtext0:'#a6adc8', subtext1:'#bac2de', overlay0:'#6c7086',
+               mauve:'#cba6f7', blue:'#89b4fa', green:'#a6e3a1', peach:'#fab387', teal:'#94e2d5' }
+};
+
+const root = document.documentElement;
+
+function apply(name) {
+  const f = FLAVORS[name];
+  if (!f) return;
+  for (const [k, v] of Object.entries(f)) {
+    if (k !== 'dark') root.style.setProperty('--' + k, v);
+  }
+  root.dataset.flavor = name;
+  root.style.colorScheme = f.dark ? 'dark' : 'light';
+  root.querySelector('meta[name="theme-color"]')?.setAttribute('content', f.base);
+
+  // Screenshots: Latte for light, Mocha for the three dark flavours. Those are
+  // the two that ship as renders; pretending otherwise would show the wrong
+  // theme rather than no theme.
+  const suffix = f.dark ? 'mocha' : 'latte';
+  document.getElementById('hero-img').src = 'img/popover-' + suffix + '.png';
+  for (const img of document.querySelectorAll('img.shot')) {
+    img.src = f.dark ? img.dataset.dark : img.dataset.latte;
+  }
+
+  for (const b of document.querySelectorAll('.flavors button')) {
+    b.setAttribute('aria-pressed', String(b.dataset.set === name));
+  }
+  try { localStorage.setItem('glance-flavor', name); } catch {}
+}
+
+document.querySelector('.flavors').addEventListener('click', (e) => {
+  const b = e.target.closest('button[data-set]');
+  if (b) apply(b.dataset.set);
+});
+
+// Start from a saved choice, else follow the OS.
+let start = 'mocha';
+try { start = localStorage.getItem('glance-flavor') || start; } catch {}
+if (!localStorage.getItem || !start) start = matchMedia('(prefers-color-scheme: light)').matches ? 'latte' : 'mocha';
+if (!(start in FLAVORS)) start = 'mocha';
+apply(start);
+
+matchMedia('(prefers-color-scheme: light)').addEventListener('change', (e) => {
+  let saved = null;
+  try { saved = localStorage.getItem('glance-flavor'); } catch {}
+  if (!saved) apply(e.matches ? 'latte' : 'mocha');
+});
+</script>
+</body>
+</html>

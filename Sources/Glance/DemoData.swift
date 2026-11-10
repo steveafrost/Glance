@@ -10,11 +10,14 @@ enum DemoData {
     static let workID = "demo-work"
     static let personalID = "demo-personal"
 
+    /// Writable, so Settings shows the same rows a user sees. Demo events are
+    /// still read-only (`isEditable: false`), and saving one fails harmlessly in
+    /// the repository because these calendar IDs are not in EventKit.
     static let calendars: [CalendarInfo] = [
         CalendarInfo(id: workID, title: "Work", sourceTitle: "Demo",
-                     color: RGBA(hex: 0x1E66F5), allowsModifications: false),
+                     color: RGBA(hex: 0x1E66F5), allowsModifications: true),
         CalendarInfo(id: personalID, title: "Personal", sourceTitle: "Demo",
-                     color: RGBA(hex: 0x40A02B), allowsModifications: false),
+                     color: RGBA(hex: 0x40A02B), allowsModifications: true),
     ]
 
     private struct Spec {

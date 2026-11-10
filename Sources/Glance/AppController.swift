@@ -133,24 +133,9 @@ final class AppController: NSObject, NSWindowDelegate {
                 delay += 0.8
                 continue
             }
-            if key == "dump-grid" {
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                    guard let self else { return }
-                    self.content.grid.publishQADump(background: self.colors.background)
-                    log.notice("qa dump-grid \(self.content.grid.model.grid.month.description, privacy: .public)")
-                }
-                delay += 0.5
-                continue
-            }
-            if key == "dump-popover" {
-                // Render the whole popover offscreen. Needs no Screen Recording
-                // permission; with --qa-demo-data it also needs no calendar data.
-                let outPath = ProcessInfo.processInfo.environment["GLANCE_QA_OUT"]
-                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
-                    guard let self else { return }
-                    self.content.publishPopoverDump(background: self.colors.background, path: outPath)
-                }
-                delay += 1.0
+            if let dump = qaDumpAction(for: key) {
+                DispatchQueue.main.asyncAfter(deadline: .now() + delay) { dump.run() }
+                delay += dump.delay
                 continue
             }
             if key == "edit-first" {
@@ -194,6 +179,66 @@ final class AppController: NSObject, NSWindowDelegate {
             }
             delay += 0.4
         }
+    }
+
+    /// A `--qa-keys` token that renders something offscreen, or nil.
+    ///
+    /// The dumps go through `cacheDisplay`, so they need no Screen Recording
+    /// permission and, with `--qa-demo-data`, no calendar data either.
+    private func qaDumpAction(for key: String) -> (delay: Double, run: @MainActor () -> Void)? {
+        switch key {
+        case "dump-grid":
+            return (delay: 0.5, run: { [weak self] in
+                guard let self else { return }
+                self.content.grid.publishQADump(background: self.colors.background)
+                log.notice("qa dump-grid \(self.content.grid.model.grid.month.description, privacy: .public)")
+            })
+        case "dump-popover":
+            let outPath = ProcessInfo.processInfo.environment["GLANCE_QA_OUT"]
+            return (delay: 1.0, run: { [weak self] in
+                guard let self else { return }
+                self.content.publishPopoverDump(background: self.colors.background, path: outPath)
+            })
+        case "dump-settings":
+            return (delay: 1.0, run: { [weak self] in
+                guard let self, let window = self.settings?.window else {
+                    log.notice("qa dump-settings: no settings window")
+                    return
+                }
+                WindowQADump.publish(window, label: "settings")
+            })
+        case "dump-editor":
+            // Pair with `edit-first`: opening the editor awaits an async draft,
+            // so the panel appears an indeterminate moment later. Poll for it
+            // rather than guessing a delay.
+            return (delay: 0.5, run: { [weak self] in
+                self?.dumpEditorWhenReady(attempts: 20)
+            })
+        default:
+            return nil
+        }
+    }
+
+    /// Render the editor once its async draft has resolved. QA only.
+    private func dumpEditorWhenReady(attempts: Int) {
+        guard let panel = editorPanel else {
+            guard attempts > 0 else {
+                log.notice("qa dump-editor: no editor panel")
+                return
+            }
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.25) { [weak self] in
+                self?.dumpEditorWhenReady(attempts: attempts - 1)
+            }
+            return
+        }
+        // Give the panel one layout pass so its views have real sizes.
+        panel.displayIfNeeded()
+        // The editor focuses the title field and selects its text. Keep the focus
+        // ring but drop the selection, which looks like a highlight in a still.
+        if let field = panel.firstResponder as? NSTextView {
+            field.setSelectedRange(NSRange(location: field.string.count, length: 0))
+        }
+        WindowQADump.publish(panel, label: "editor")
     }
 
     /// Scroll events for a QA swipe: began, 12 changed, ended, then 20 momentum events.
@@ -271,6 +316,10 @@ final class AppController: NSObject, NSWindowDelegate {
         }
         onNotification(NSApplication.didBecomeActiveNotification) { [weak self] _ in self?.model.recheckAccess() }
         onNotification(Preferences.didChange) { [weak self] key in self?.preferenceChanged(key) }
+        onNotification(Updater.didChange) { [weak self] _ in
+            self?.status.setUpdateWaiting(Updater.shared.hasQuietUpdate)
+        }
+        status.setUpdateWaiting(Updater.shared.hasQuietUpdate)
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(interfaceThemeChanged),
                                                             name: .init("AppleInterfaceThemeChangedNotification"), object: nil)
     }
@@ -596,14 +645,34 @@ final class AppController: NSObject, NSWindowDelegate {
 
     private func edit(_ e: EventSnapshot) {
         Task {
-            guard let draft = await model.repository.draft(for: e) else {
+            // Demo events are not in EventKit, so there is no store to ask for a
+            // draft; build one from the snapshot instead.
+            let draft = model.qaDemoData ? Self.demoDraft(for: e) : await model.repository.draft(for: e)
+            guard let draft else {
                 showAlert("Event not found", "This event no longer exists. It may have been deleted on another device.")
                 model.reloadNow()
                 return
             }
             let row = content.agenda.rows.firstIndex { if case .event(let x, _) = $0 { x.id == e.id } else { false } }
-            presentEditor(draft, editable: e.isEditable, anchor: content.agenda, rect: agendaRowRect(row))
+            // Demo events are read-only so QA keys cannot mutate them, but the
+            // docs shot should show the editor as a user sees it: with Save and
+            // Delete. Nothing is saved in demo mode (the store has no event).
+            let editable = e.isEditable || model.qaDemoData
+            presentEditor(draft, editable: editable, anchor: content.agenda, rect: agendaRowRect(row))
         }
+    }
+
+    /// A draft for an invented event, so the QA editor dump has something to
+    /// show without touching EventKit. QA only (`--qa-demo-data`).
+    private static func demoDraft(for event: EventSnapshot) -> EventDraft {
+        // Demo events carry a meeting link but no plain `url`; the editor shows
+        // both in the same field, so fall back to the meeting.
+        let url = event.url ?? event.meetingURL
+        return EventDraft(eventIdentifier: event.eventIdentifier, occurrenceStart: event.occurrenceStart,
+                          isRecurring: event.isRecurring, title: event.title, isAllDay: event.isAllDay,
+                          start: event.start, end: event.end, calendarID: event.calendarID,
+                          location: event.location ?? "", urlText: url?.absoluteString ?? "",
+                          notes: event.notes ?? "")
     }
 
     private func agendaRowRect(_ row: Int?) -> CGRect {
