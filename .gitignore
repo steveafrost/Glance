@@ -8,3 +8,4 @@ dist/
 # marketing site (Vercel CLI local state)
 site/.vercel/
 site/.env*
+.vercel

@@ -14,7 +14,7 @@ updates.
 Requires **macOS 26** or later — the current release and the one before it.
 There is no build for older releases.
 
-Website: **[glancecalendar.app](https://glancecalendar.app)**
+Website: **[glancecal.com](https://glancecal.com)**
 
 [![Buy me a coffee](https://img.shields.io/badge/buy%20me%20a%20coffee-stevefrost-FFDD00?style=flat&logo=buy-me-a-coffee&logoColor=black)](https://buymeacoffee.com/stevefrost)
 
