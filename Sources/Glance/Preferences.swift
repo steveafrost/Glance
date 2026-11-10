@@ -13,7 +13,7 @@ final class Preferences {
         case theme, firstWeekday, highlightedWeekdays, showWeekNumbers, showEventDots
         case clockFormat, hideIcon, iconStyle, iconOpticalOffset, hotKey
         case selectedCalendarIDs, agendaDays, showEmptyAgendaDays
-        case showMeetingIndicator, meetingLeadMinutes, alwaysTopRight
+        case meetingLeadMinutes, alwaysTopRight
     }
 
     private init() {
@@ -29,7 +29,6 @@ final class Preferences {
             Key.iconOpticalOffset.rawValue: 0.0,
             Key.agendaDays.rawValue: 7,
             Key.showEmptyAgendaDays.rawValue: false,
-            Key.showMeetingIndicator.rawValue: true,
             Key.meetingLeadMinutes.rawValue: 5,
             Key.alwaysTopRight.rawValue: false,
         ])
@@ -121,11 +120,6 @@ final class Preferences {
     var showEmptyAgendaDays: Bool {
         get { defaults.bool(forKey: Key.showEmptyAgendaDays.rawValue) }
         set { defaults.set(newValue, forKey: Key.showEmptyAgendaDays.rawValue); changed(.showEmptyAgendaDays) }
-    }
-
-    var showMeetingIndicator: Bool {
-        get { defaults.bool(forKey: Key.showMeetingIndicator.rawValue) }
-        set { defaults.set(newValue, forKey: Key.showMeetingIndicator.rawValue); changed(.showMeetingIndicator) }
     }
 
     var meetingLeadMinutes: Int {

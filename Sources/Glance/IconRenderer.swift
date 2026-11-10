@@ -23,22 +23,21 @@ enum IconRenderer {
         return CTLineCreateWithAttributedString(attr)
     }
 
-    static func image(text: String?, style: IconLayout.Style, meeting: Bool,
+    static func image(text: String?, style: IconLayout.Style,
                       placement: IconLayout.Placement, opticalOffset: CGFloat) -> NSImage {
-        render(text: text, style: style, meeting: meeting, placement: placement, opticalOffset: opticalOffset).image
+        render(text: text, style: style, placement: placement, opticalOffset: opticalOffset).image
     }
 
-    static func render(text: String?, style: IconLayout.Style, meeting: Bool,
+    static func render(text: String?, style: IconLayout.Style,
                        placement: IconLayout.Placement, opticalOffset: CGFloat) -> (image: NSImage, layout: IconLayout) {
         var m = IconLayout.Metrics()
         m.opticalOffset = opticalOffset
-        let layout = IconLayout(text: text.map { metrics(for: $0, style: style) }, showsMeeting: meeting,
+        let layout = IconLayout(text: text.map { metrics(for: $0, style: style) },
                                 placement: placement, metrics: m)
         let font = font(for: style)
         let image = NSImage(size: layout.canvasSize, flipped: false) { _ in
             guard let ctx = NSGraphicsContext.current?.cgContext else { return false }
             ctx.setFillColor(NSColor.black.cgColor)
-            if let r = layout.meetingRect { drawMeetingGlyph(in: r) }
             guard let box = layout.boxRect, let text, let origin = layout.textOrigin else { return true }
             let outer = CGPath(roundedRect: box, cornerWidth: layout.cornerRadius, cornerHeight: layout.cornerRadius, transform: nil)
             let line = ctLine(text, font: font)
@@ -67,17 +66,5 @@ enum IconRenderer {
         }
         image.isTemplate = true
         return (image, layout)
-    }
-
-    private static func drawMeetingGlyph(in rect: CGRect) {
-        let config = NSImage.SymbolConfiguration(pointSize: 11, weight: .semibold)
-        guard let symbol = NSImage(systemSymbolName: "video.fill", accessibilityDescription: "Meeting")?
-            .withSymbolConfiguration(config) else { return }
-        // Fit the symbol's aspect inside rect, centred.
-        let s = symbol.size
-        let scale = min(rect.width / s.width, rect.height / s.height)
-        let size = CGSize(width: s.width * scale, height: s.height * scale)
-        let r = CGRect(x: rect.midX - size.width / 2, y: rect.midY - size.height / 2, width: size.width, height: size.height)
-        symbol.draw(in: r)
     }
 }

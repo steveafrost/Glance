@@ -316,10 +316,6 @@ final class AppController: NSObject, NSWindowDelegate {
         }
         onNotification(NSApplication.didBecomeActiveNotification) { [weak self] _ in self?.model.recheckAccess() }
         onNotification(Preferences.didChange) { [weak self] key in self?.preferenceChanged(key) }
-        onNotification(Updater.didChange) { [weak self] _ in
-            self?.status.setUpdateWaiting(Updater.shared.hasQuietUpdate)
-        }
-        status.setUpdateWaiting(Updater.shared.hasQuietUpdate)
         DistributedNotificationCenter.default().addObserver(self, selector: #selector(interfaceThemeChanged),
                                                             name: .init("AppleInterfaceThemeChangedNotification"), object: nil)
     }
@@ -374,7 +370,6 @@ final class AppController: NSObject, NSWindowDelegate {
         let events = model.events(on: today) + model.events(on: today.adding(days: 1))
         let state = MeetingSchedule.state(events: events, now: now, lead: TimeInterval(prefs.meetingLeadMinutes * 60))
         meeting = state
-        status.setMeetingActive(state.activeEventID != nil)
         content.agenda.activeMeetingID = state.activeEventID
         meetingTimer?.invalidate()
         meetingTimer = nil
@@ -393,7 +388,7 @@ final class AppController: NSObject, NSWindowDelegate {
         switch key {
         case "theme": applyTheme()
         case "clockFormat": status.configureClock(); scheduleClockTick()
-        case "hideIcon", "iconStyle", "showMeetingIndicator": status.update()
+        case "hideIcon", "iconStyle": status.update()
         case "meetingLeadMinutes": updateMeetingState()
         case "hotKey":
             if let message = HotKeyCenter.shared.register(prefs.hotKey) { settings?.showHotKeyError(message) }

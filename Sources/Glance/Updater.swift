@@ -140,8 +140,9 @@ extension Updater: NSMenuItemValidation {
 /// menu bar app's users will not see it.
 ///
 /// A menu bar app has no window to put a dialog in front of, so the reminder
-/// here is quiet: the menu item becomes "Update to <version>…" and the icon
-/// gains a badge. No panel appears until the user acts on one of those.
+/// here is quiet: the menu item becomes "Update to <version>…". Nothing is
+/// drawn into the menu bar icon, which always shows the date and nothing else.
+/// No panel appears until the user acts on the menu item.
 ///
 /// That means always handling the presentation ourselves, immediate focus
 /// included: `immediateFocus` means Sparkle thinks it may present in "utmost

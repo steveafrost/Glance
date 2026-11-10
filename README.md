@@ -68,8 +68,8 @@ Check for Updates… in the ⋯ menu or the icon's right-click menu.
   auto (Latte/Mocha) and System light/dark.
 - **Meetings**: Zoom, Google Meet, Teams, Webex (and a few others) are found
   in an event's location, URL or notes. The agenda gets a join button
-  (opening the native app when installed) and the menu bar shows a camera
-  while a call is current or about to start. ⌘J joins it.
+  (opening the native app when installed) and highlights the call that is
+  current or about to start. ⌘J joins it.
 - **Events**: create, edit and delete (with confirmation and a this/future
   prompt for repeating events). Declined events are hidden.
 - **Calendars**: choose which appear, grouped by account.

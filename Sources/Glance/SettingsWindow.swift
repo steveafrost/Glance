@@ -377,10 +377,7 @@ private struct GeneralSettings: View {
                     SettingsNote(text: "With no icon and no clock there’s nothing to click, so Glance keeps showing the date icon.")
                 }
                 ClockRows(state: state)
-                SettingsRow(label: "Meeting indicator", caption: "A camera beside the icon while a call is on or about to start") {
-                    ThemedSwitch(isOn: state.binding(\.showMeetingIndicator))
-                }
-                SettingsRow(label: "Meeting indicator lead time", disabled: !prefs.showMeetingIndicator) {
+                SettingsRow(label: "Meeting lead time", caption: "How early a call counts as current, for the agenda highlight and ⌘J") {
                     ThemedStepper(value: state.binding(\.meetingLeadMinutes), range: 0...30, format: SettingsModel.minutes)
                 }
                 SettingsRow(label: "Open at the top right of the screen", caption: "Instead of under the menu bar icon") {

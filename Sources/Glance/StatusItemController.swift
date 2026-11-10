@@ -1,7 +1,12 @@
 import AppKit
 import GlanceCore
 
-/// The menu bar item: date icon, optional clock text, meeting indicator.
+/// The menu bar item: date icon and optional clock text.
+///
+/// The icon is deliberately constant: it shows the day number and nothing else.
+/// No meeting camera and no update badge are drawn into it, so its pixels never
+/// change while the app runs. Those signals live elsewhere (the agenda's Join
+/// button, the menu item title, the accessibility label).
 @MainActor
 final class StatusItemController: NSObject, NSMenuDelegate {
     let item: NSStatusItem
@@ -15,9 +20,6 @@ final class StatusItemController: NSObject, NSMenuDelegate {
     private var widestClock = ""
     private var lengthCache: (key: String, length: CGFloat)?
     private var iconCache: (key: String, image: NSImage, box: CGRect?)?
-    private var meetingActive = false
-    /// A scheduled update check found something and the user hasn't looked yet.
-    private var updateWaiting = false
     private var lastPlacement: IconLayout.Placement?
     private var observers: [any NSObjectProtocol] = []
 
@@ -59,32 +61,15 @@ final class StatusItemController: NSObject, NSMenuDelegate {
         update()
     }
 
-    func setMeetingActive(_ active: Bool) {
-        // QA: keep the meeting glyph on to check alignment beside it.
-        let active = active || ProcessInfo.processInfo.arguments.contains("--qa-meeting")
-        guard active != meetingActive else { return }
-        meetingActive = active
-        update()
-    }
-
-    /// A quiet update was found (or dismissed): show or hide the badge.
-    func setUpdateWaiting(_ waiting: Bool) {
-        guard waiting != updateWaiting else { return }
-        updateWaiting = waiting
-        update()
-    }
-
     /// Redraw the icon and clock text for "now".
     func update(now: Date = Date()) {
         guard let button = item.button else { return }
-        let showMeeting = meetingActive && prefs.showMeetingIndicator
         let day = Calendar.autoupdatingCurrent.component(.day, from: now)
         let iconText: String? = prefs.hideIcon ? nil : String(day)
         let placement = currentPlacement()
         lastPlacement = placement
 
-        let image = (iconText != nil || showMeeting)
-            ? icon(text: iconText, meeting: showMeeting, placement: placement) : nil
+        let image = iconText.map { icon(text: $0, placement: placement) }
         if button.image !== image { button.image = image }
 
         var title = ""
@@ -103,47 +88,27 @@ final class StatusItemController: NSObject, NSMenuDelegate {
             item.length = NSStatusItem.variableLength
             if button.image == nil {
                 // Nothing to show: keep a minimal glyph so the item stays clickable.
-                button.image = icon(text: String(day), meeting: false, placement: placement)
+                button.image = icon(text: String(day), placement: placement)
             }
         }
 
         var label = "Glance"
         if let iconText { label += ", \(iconText)" }
         if !title.isEmpty { label += ", \(title)" }
-        if showMeeting { label += ", meeting now" }
-        if updateWaiting { label += ", update available" }
         button.setAccessibilityLabel(label)
-        button.toolTip = updateWaiting ? "A Glance update is available" : nil
+        button.toolTip = nil
     }
 
-    /// The icon only changes with the day, style, meeting state, update badge
-    /// or placement, so clock ticks reuse the same image.
-    private func icon(text: String?, meeting: Bool, placement: IconLayout.Placement) -> NSImage {
-        let key = "\(text ?? "-")|\(prefs.iconStyle)|\(meeting)|\(updateWaiting)|"
-            + "\(placement)|\(prefs.iconOpticalOffset)"
+    /// The icon only changes with the day, style or placement, so clock ticks
+    /// reuse the same image.
+    private func icon(text: String, placement: IconLayout.Placement) -> NSImage {
+        let key = "\(text)|\(prefs.iconStyle)|\(placement)|\(prefs.iconOpticalOffset)"
         if let c = iconCache, c.key == key { return c.image }
-        let (image, layout) = IconRenderer.render(text: text, style: prefs.iconStyle, meeting: meeting,
-                                                  placement: placement, opticalOffset: prefs.iconOpticalOffset)
+        let (image, layout) = IconRenderer.render(text: text, style: prefs.iconStyle,
+                                                  placement: placement,
+                                                  opticalOffset: prefs.iconOpticalOffset)
         iconCache = (key, image, layout.boxRect)
-        return updateWaiting ? Self.badged(image) : image
-    }
-
-    /// Draws a small dot in the icon's top-right corner, just clear of the date
-    /// box so it reads as a separate mark rather than a lump on the corner.
-    /// Returned as a template image like the rest of the icon, so it follows the
-    /// menu bar's tint.
-    private static func badged(_ image: NSImage) -> NSImage {
-        let size = image.size
-        let dot: CGFloat = 3
-        let out = NSImage(size: size, flipped: false) { _ in
-            image.draw(in: CGRect(origin: .zero, size: size))
-            let rect = CGRect(x: size.width - dot, y: size.height - dot, width: dot, height: dot)
-            NSColor.black.setFill()
-            NSBezierPath(ovalIn: rect).fill()
-            return true
-        }
-        out.isTemplate = true
-        return out
+        return image
     }
 
     private var clockFont: NSFont {

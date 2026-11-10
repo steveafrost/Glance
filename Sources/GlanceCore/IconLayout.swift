@@ -55,22 +55,19 @@ public struct IconLayout: Equatable, Sendable {
         public var horizontalPadding: CGFloat = 4
         public var cornerRadius: CGFloat = 4
         public var outlineWidth: CGFloat = 1.5
-        public var meetingGlyphSize = CGSize(width: 16, height: 11)
-        public var meetingGap: CGFloat = 3
         /// Shift (points, + = down) from the bar's geometric centre.
         public var opticalOffset: CGFloat = 0
         public init() {}
     }
 
     public let canvasSize: CGSize
-    /// Nil when the date icon is hidden (meeting glyph only).
+    /// Nil when the icon has no date box.
     public let boxRect: CGRect?
     public let textOrigin: CGPoint?
-    public let meetingRect: CGRect?
     public let cornerRadius: CGFloat
     public let outlineWidth: CGFloat
 
-    public init(text: TextMetrics?, showsMeeting: Bool, placement: Placement, metrics: Metrics = Metrics()) {
+    public init(text: TextMetrics?, placement: Placement, metrics: Metrics = Metrics()) {
         let s = placement.scale
         func px(_ v: CGFloat) -> CGFloat { (v * s).rounded() / s }
 
@@ -87,13 +84,6 @@ public struct IconLayout: Equatable, Sendable {
         }
 
         var x: CGFloat = 0
-        if showsMeeting {
-            let g = metrics.meetingGlyphSize
-            meetingRect = CGRect(x: 0, y: originY(height: g.height), width: g.width, height: g.height)
-            x = g.width + (text == nil ? 0 : metrics.meetingGap)
-        } else {
-            meetingRect = nil
-        }
 
         if let text {
             let width = max(metrics.minBoxWidth, (text.width + 2 * metrics.horizontalPadding).rounded(.up))
