@@ -9,3 +9,5 @@ dist/
 site/.vercel/
 site/.env*
 .vercel
+Glance.xcodeproj/
+*.xcarchive

@@ -7,10 +7,7 @@ let package = Package(
     products: [
         .executable(name: "Glance", targets: ["Glance"]),
     ],
-    dependencies: [
-        // Auto-update only. Glance has no other third-party code.
-        .package(url: "https://github.com/sparkle-project/Sparkle", exact: "2.10.1"),
-    ],
+    dependencies: [],
     targets: [
         // Pure, AppKit-free logic: date math, parsing, layout geometry, caching.
         .target(
@@ -20,7 +17,7 @@ let package = Package(
         // The AppKit app.
         .executableTarget(
             name: "Glance",
-            dependencies: ["GlanceCore", .product(name: "Sparkle", package: "Sparkle")],
+            dependencies: ["GlanceCore"],
             swiftSettings: [.enableUpcomingFeature("ExistentialAny")],
             linkerSettings: [
                 .linkedFramework("AppKit"),

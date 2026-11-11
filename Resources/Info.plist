@@ -19,9 +19,9 @@
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleShortVersionString</key>
-    <string>__VERSION__</string>
+    <string>$(MARKETING_VERSION)</string>
     <key>CFBundleVersion</key>
-    <string>__BUILD__</string>
+    <string>$(CURRENT_PROJECT_VERSION)</string>
     <key>LSApplicationCategoryType</key>
     <string>public.app-category.productivity</string>
     <key>LSMinimumSystemVersion</key>
@@ -38,19 +38,7 @@
     <false/>
     <key>NSSupportsSuddenTermination</key>
     <true/>
-    <!-- Sparkle 2 (sandboxed). Feed comes from the build (GLANCE_FEED_URL);
-         dev builds get a .invalid placeholder and never check. -->
-    <key>SUFeedURL</key>
-    <string>__FEED_URL__</string>
-    <key>SUPublicEDKey</key>
-    <string>ZbfBuMIzpWZBVeUJ49c7mi7KyguG6eD35d9WHhmD+UU=</string>
-    <key>SUEnableAutomaticChecks</key>
-    <true/>
-    <key>SUEnableSystemProfiling</key>
-    <false/>
-    <key>SUEnableInstallerLauncherService</key>
-    <true/>
-    <key>SUEnableDownloaderService</key>
-    <true/>
+    <!-- No SU* updater keys on purpose: the App Store delivers updates. The
+         OfflineGuardTests fail the build if one comes back. -->
 </dict>
 </plist>

@@ -38,7 +38,6 @@ enum MainMenu {
         let main = NSMenu()
         let appMenu = NSMenu()
         appMenu.addItem(withTitle: "Settings…", action: #selector(AppController.openSettings(_:)), keyEquivalent: ",")
-        appMenu.addItem(Updater.shared.menuItem())
         appMenu.addItem(.separator())
         appMenu.addItem(withTitle: "Quit Glance", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
         main.addItem(withTitle: "Glance", action: nil, keyEquivalent: "").submenu = appMenu

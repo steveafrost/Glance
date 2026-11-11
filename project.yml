@@ -1,0 +1,104 @@
+# Xcode project for the Mac App Store build.
+#
+# Glance ships two ways from one source tree:
+#   Package.swift → `swift build` / `swift test`, the developer loop
+#   project.yml   → Glance.xcodeproj, the App Store build
+#
+# The App Store needs a real .app bundle signed with an Apple Distribution
+# identity, which SwiftPM cannot produce. This file is generated, not tracked:
+#   xcodegen generate
+#
+# Keep the two in step. Anything added to Sources/ is picked up automatically,
+# but a new framework has to be listed here as well as in Package.swift.
+
+name: Glance
+options:
+  bundleIdPrefix: com.steveafrost
+  deploymentTarget:
+    macOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: false
+
+settings:
+  base:
+    MARKETING_VERSION: "1.0.0"
+    CURRENT_PROJECT_VERSION: "1"
+    SWIFT_VERSION: "6.0"
+    DEVELOPMENT_TEAM: 4QJ25Y85MX
+    # Match Package.swift's swiftSettings so the two builds compile alike.
+    OTHER_SWIFT_FLAGS: $(inherited) -enable-upcoming-feature ExistentialAny
+    ENABLE_HARDENED_RUNTIME: YES
+    # App Store builds must not carry a timestamp-free ad-hoc signature.
+    CODE_SIGN_STYLE: Manual
+
+targets:
+  GlanceCore:
+    type: framework
+    platform: macOS
+    sources:
+      - path: Sources/GlanceCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.steveafrost.GlanceCore
+        # A real dynamic framework, the same shape SwiftPM produces, so Xcode
+        # signs and embeds it inside the app. A staticlib Mach-O type inside a
+        # framework wrapper is not a valid bundle and fails at codesign.
+        DEFINES_MODULE: YES
+        SKIP_INSTALL: YES
+        GENERATE_INFOPLIST_FILE: YES
+
+  Glance:
+    type: application
+    platform: macOS
+    sources:
+      - path: Sources/Glance
+    dependencies:
+      - target: GlanceCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.steveafrost.Glance
+        PRODUCT_NAME: Glance
+        INFOPLIST_FILE: Resources/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Resources/Glance.entitlements
+        CODE_SIGN_IDENTITY: "Apple Distribution"
+        # A Mac App Store build: needs the profile embedded and no
+        # get-task-allow entitlement, which a Release build must not carry.
+        CODE_SIGN_STYLE: Manual
+        PROVISIONING_PROFILE_SPECIFIER: "Glance Mac App Store"
+        ENABLE_APP_SANDBOX: YES
+        # Xcode otherwise injects get-task-allow, which the App Store rejects.
+        CODE_SIGN_INJECT_BASE_ENTITLEMENTS: NO
+        ENABLE_TESTABILITY: NO
+        ASSETCATALOG_COMPILER_APPICON_NAME: ""
+        # The icon is a plain .icns, not an asset catalog.
+        COMBINE_HIDPI_IMAGES: YES
+        # Nothing here is a document; the app is a menu bar extra.
+        SKIP_INSTALL: NO
+    entitlements:
+      path: Resources/Glance.entitlements
+      properties:
+        com.apple.security.app-sandbox: true
+        com.apple.security.personal-information.calendars: true
+
+  GlanceCoreTests:
+    type: bundle.unit-test
+    platform: macOS
+    sources:
+      - path: Tests/GlanceCoreTests
+    dependencies:
+      - target: Glance
+    settings:
+      base:
+        # The tests inspect the source tree by relative path.
+        TEST_HOST: ""
+        BUNDLE_LOADER: ""
+
+schemes:
+  Glance:
+    build:
+      targets:
+        Glance: all
+    run:
+      config: Release
+    archive:
+      config: Release

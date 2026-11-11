@@ -1,10 +1,10 @@
 import XCTest
 
 /// Glance reads only local calendar data (EventKit) and never goes online.
-/// Sparkle's Downloader XPC service does update fetching outside the app
-/// process, so the app itself must never gain network access. These tests
-/// read the source tree; script/check-offline.sh runs the same checks plus a
-/// built app's signed entitlements.
+/// There is no updater and no network entitlement, so the App Store build is
+/// offline by construction. These tests read the source tree;
+/// script/check-offline.sh runs the same checks plus a built app's signed
+/// entitlements.
 final class OfflineGuardTests: XCTestCase {
     private let root = URL(fileURLWithPath: #filePath)
         .deletingLastPathComponent().deletingLastPathComponent().deletingLastPathComponent()
@@ -26,9 +26,29 @@ final class OfflineGuardTests: XCTestCase {
         XCTAssertFalse(ents.contains("com.apple.security.network.client"))
         XCTAssertFalse(ents.contains("com.apple.security.network.server"))
         XCTAssertTrue(ents.contains("com.apple.security.app-sandbox"))
-        // Sparkle's Downloader service is what keeps the app offline.
+        // Any mach-lookup exception would widen what the sandbox can reach.
+        XCTAssertFalse(ents.contains("temporary-exception.mach-lookup"))
+    }
+
+    /// No updater, so no feed and no EdDSA key to ship or keep secret.
+    func testPlistHasNoUpdaterKeys() throws {
         let plist = try read("Resources/Info.plist")
-        XCTAssertTrue(plist.contains("<key>SUEnableDownloaderService</key>\n    <true/>"))
+        for key in ["SUFeedURL", "SUPublicEDKey", "SUEnableAutomaticChecks",
+                    "SUEnableDownloaderService", "SUEnableInstallerLauncherService",
+                    "SUEnableSystemProfiling"] {
+            XCTAssertFalse(plist.contains("<key>\(key)</key>"), "Info.plist still ships \(key)")
+        }
+    }
+
+    /// The App Store provides updates. A bundled updater is rejected, so a
+    /// reintroduced Sparkle dependency should fail here rather than at review.
+    func testNoThirdPartyDependencies() throws {
+        let pkg = try read("Package.swift")
+        XCTAssertEqual(pkg.components(separatedBy: ".package(url:").count - 1, 0, "Package.swift gained a dependency")
+        XCTAssertFalse(pkg.contains("sparkle-project/Sparkle"), "Sparkle must not come back")
+        for (path, text) in try sources() {
+            XCTAssertFalse(text.contains("import Sparkle"), "\(path) imports Sparkle")
+        }
     }
 
     func testSourcesUseNoNetworkingOrWebAPIs() throws {
@@ -48,14 +68,14 @@ final class OfflineGuardTests: XCTestCase {
         // No Network, WebKit, CloudKit, Contacts, etc. EventKit is the only data source.
         let allowed: Set<String> = ["AppKit", "Foundation", "EventKit", "Carbon.HIToolbox", "CoreGraphics",
                                     "CoreText", "QuartzCore", "ServiceManagement", "SwiftUI", "os",
-                                    "GlanceCore", "Sparkle"]
-        let regex = try NSRegularExpression(pattern: #"^\s*(?:@\w+\s+)*import\s+(?:class\s+|struct\s+|enum\s+|func\s+)?([A-Za-z_][A-Za-z0-9_.]*)"#,
-                                            options: .anchorsMatchLines)
+                                    "GlanceCore"]
+        let pattern = #"^\s*(?:@\w+\s+)*import\s+(?:class\s+|struct\s+|enum\s+|func\s+)?"#
+            + #"([A-Za-z_][A-Za-z0-9_.]*)"#
+        let regex = try NSRegularExpression(pattern: pattern, options: .anchorsMatchLines)
         for (path, text) in try sources() {
             for m in regex.matches(in: text, range: NSRange(text.startIndex..., in: text)) {
                 let name = String(text[Range(m.range(at: 1), in: text)!])
                 XCTAssertTrue(allowed.contains(name), "\(path) imports \(name)")
-                if name == "Sparkle" { XCTAssertEqual(path, "Sources/Glance/Updater.swift", "keep Sparkle in Updater.swift") }
             }
         }
     }
@@ -64,10 +84,5 @@ final class OfflineGuardTests: XCTestCase {
         for (path, text) in try sources() where text.contains("EKEventStore(") {
             XCTAssertEqual(path, "Sources/Glance/EventRepository.swift", "\(path) creates its own event store")
         }
-        // Sparkle is the only package dependency.
-        let pkg = try read("Package.swift")
-        let deps = pkg.components(separatedBy: ".package(url:").count - 1
-        XCTAssertEqual(deps, 1)
-        XCTAssertTrue(pkg.contains("sparkle-project/Sparkle"))
     }
 }

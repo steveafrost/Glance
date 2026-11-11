@@ -1,46 +1,39 @@
 #!/bin/bash
-# Build Glance.app: release binary, Sparkle.framework, Info.plist, icon,
-# entitlements, signature (inside-out).
+# Build Glance.app for local use: release binary, Info.plist, icon,
+# entitlements, signature.
 #
 #   script/build-app.sh             # dev build to build/Glance.app (Apple Development)
 #   script/build-app.sh --install   # ...and replace /Applications/Glance.app, then launch it
-#   script/build-app.sh --release   # Developer ID, secure timestamp, real update feed
 #
 # Dev signing uses $GLANCE_SIGN_IDENTITY, else the first "Apple Development"
 # identity, else ad-hoc. A stable identity keeps the Calendar permission across
-# rebuilds. Dev builds get a placeholder feed (never check for updates) unless
-# $GLANCE_FEED_URL is set. --release signs with $GLANCE_RELEASE_IDENTITY
-# (default "Developer ID Application: Steve Frost (4QJ25Y85MX)").
+# rebuilds.
+#
+# This is the local/QA build. It is NOT the App Store build: that one is
+# `xcodegen generate && xcodebuild archive` from project.yml, signed with an
+# Apple Distribution identity and the Mac App Store provisioning profile.
+# See script/mas-build.sh.
 set -euo pipefail
 cd "$(dirname "$0")/.."
 source script/xcode-env.sh
 
-MODE=dev; INSTALL=0
+INSTALL=0
 for a in "$@"; do
   case $a in
     --install) INSTALL=1 ;;
-    --release) MODE=release ;;
+    --release) echo "build-app: --release is gone; the App Store build is script/mas-build.sh" >&2; exit 2 ;;
     *) echo "unknown option: $a" >&2; exit 2 ;;
   esac
 done
 
-DEFAULT_FEED=https://github.com/steveafrost/Glance/releases/latest/download/appcast.xml
 VERSION="${GLANCE_VERSION:-0.1.0}"
 BUILD="$(git rev-list --count HEAD 2>/dev/null || echo 1)"
 APP=build/Glance.app
 
-if [[ $MODE == release ]]; then
-  IDENTITY="${GLANCE_RELEASE_IDENTITY:-Developer ID Application: Steve Frost (4QJ25Y85MX)}"
-  TIMESTAMP=--timestamp
-  FEED="${GLANCE_FEED_URL:-$DEFAULT_FEED}"
-else
-  IDENTITY="${GLANCE_SIGN_IDENTITY:-}"
-  if [[ -z $IDENTITY ]]; then
-    IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Apple Development: [^"]*\)".*/\1/p' | tail -1)
-    IDENTITY=${IDENTITY:--}
-  fi
-  TIMESTAMP=--timestamp=none
-  FEED="${GLANCE_FEED_URL:-https://updates.glance.invalid/appcast.xml}"
+IDENTITY="${GLANCE_SIGN_IDENTITY:-}"
+if [[ -z $IDENTITY ]]; then
+  IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null | sed -n 's/.*"\(Apple Development: [^"]*\)".*/\1/p' | tail -1)
+  IDENTITY=${IDENTITY:--}
 fi
 
 swift build -c release --arch arm64 --product Glance
@@ -49,34 +42,33 @@ BIN_DIR="$(swift build -c release --arch arm64 --product Glance --show-bin-path)
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
 cp "$BIN_DIR/Glance" "$APP/Contents/MacOS/Glance"
-# ditto keeps the framework's symlinks and its XPC services in place.
-ditto "$BIN_DIR/Sparkle.framework" "$APP/Contents/Frameworks/Sparkle.framework"
-# SwiftPM links with @loader_path; the framework lives in Contents/Frameworks.
+# SwiftPM links with @loader_path; keep the rpath pointing inside the bundle so
+# the embedded GlanceCore framework resolves once one is copied in.
 install_name_tool -delete_rpath @loader_path "$APP/Contents/MacOS/Glance" 2>/dev/null || true
 install_name_tool -add_rpath @executable_path/../Frameworks "$APP/Contents/MacOS/Glance"
+if [[ -d $BIN_DIR/GlanceCore.framework ]]; then
+  ditto "$BIN_DIR/GlanceCore.framework" "$APP/Contents/Frameworks/GlanceCore.framework"
+fi
 cp Resources/AppIcon.icns "$APP/Contents/Resources/AppIcon.icns"
-sed -e "s/__VERSION__/$VERSION/" -e "s/__BUILD__/$BUILD/" -e "s|__FEED_URL__|$FEED|" \
+# Info.plist carries $(MARKETING_VERSION)/$(CURRENT_PROJECT_VERSION) for the
+# Xcode App Store build; fill them in here for the SwiftPM dev build.
+sed -e "s/\$(MARKETING_VERSION)/$VERSION/g" -e "s/\$(CURRENT_PROJECT_VERSION)/$BUILD/g" \
   Resources/Info.plist > "$APP/Contents/Info.plist"
 plutil -lint "$APP/Contents/Info.plist" >/dev/null
 printf 'APPL????' > "$APP/Contents/PkgInfo"
 
-# Inside-out, per Sparkle's sandboxing guide. No --deep: the Downloader
-# keeps its own entitlements.
-sign() { codesign --force --options runtime $TIMESTAMP --sign "$IDENTITY" "$@"; }
-SP="$APP/Contents/Frameworks/Sparkle.framework/Versions/B"
-sign "$SP/XPCServices/Installer.xpc"
-sign --preserve-metadata=entitlements "$SP/XPCServices/Downloader.xpc"
-sign "$SP/Autoupdate"
-sign "$SP/Updater.app"
-sign "$APP/Contents/Frameworks/Sparkle.framework"
+sign() { codesign --force --options runtime --timestamp=none --sign "$IDENTITY" "$@"; }
+[[ -d $APP/Contents/Frameworks/GlanceCore.framework ]] && sign "$APP/Contents/Frameworks/GlanceCore.framework"
 sign --entitlements Resources/Glance.entitlements "$APP"
 codesign --verify --strict --deep "$APP"
-echo "Built $APP (v$VERSION build $BUILD, $MODE), signed with: $IDENTITY"
+echo "Built $APP (v$VERSION build $BUILD), signed with: $IDENTITY"
 
 if [[ $INSTALL == 1 ]]; then
-  pkill -x Glance 2>/dev/null && sleep 0.5 || true
+  [[ -w /Applications ]] || { echo "build-app: no write access to /Applications" >&2; exit 1; }
+  # Quit a running copy and clear the QA pasteboard so --qa-* flags start clean.
+  osascript -e 'quit app "Glance"' 2>/dev/null || true
   rm -rf /Applications/Glance.app
-  cp -R "$APP" /Applications/Glance.app
+  ditto "$APP" /Applications/Glance.app
   open /Applications/Glance.app
-  echo "Installed and launched /Applications/Glance.app"
+  echo "Installed /Applications/Glance.app"
 fi

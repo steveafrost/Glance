@@ -7,12 +7,12 @@
 
 A small native macOS menu bar calendar: today's date in the menu bar, a
 month grid and agenda under it, Catppuccin themes, meeting join links and
-event editing. Swift 6 (strict concurrency) and AppKit, EventKit for data.
-The only third-party code is [Sparkle](https://sparkle-project.org) for
-updates.
+event editing. Swift 6 (strict concurrency) and AppKit, EventKit for data,
+no third-party code at all.
 
-Requires **macOS 26** or later — the current release and the one before it.
-There is no build for older releases.
+Glance is **$0.99 on the Mac App Store**. Requires **macOS 26** or later —
+the current release and the one before it. There is no build for older
+releases.
 
 Website: **[glancecal.com](https://glancecal.com)**
 
@@ -33,25 +33,21 @@ These are drawn by the app itself, not captured from a screen — see
 
 ## Install
 
-Download the latest `Glance-<version>.zip` from
-[Releases](https://github.com/steveafrost/Glance/releases/latest), unzip it
-and move `Glance.app` to Applications. It's signed with Developer ID and
-notarized. On first launch Glance opens under its menu bar icon and macOS asks
-for calendar access.
+From the Mac App Store. On first launch Glance opens under its menu bar icon
+and macOS asks for calendar access.
+
+This repository is the source. It is not the distribution channel: the App
+Store build is the only supported binary, and the store delivers updates.
 
 ## Privacy
 
 Glance reads your calendars through macOS (EventKit) and nothing else. There
 are no accounts and no sign-ins, and the app has no network access at all:
-it's sandboxed without the outgoing-connections entitlement. Updates are
-fetched by Sparkle's separate Downloader service, which only downloads the
-update feed and update archives from this repository's GitHub Releases. It
-sends nothing about you or your calendars (system profiling is off).
-`script/check-offline.sh` and `OfflineGuardTests` fail the build if this
-ever changes.
-
-Updates are checked once a day; turn that off in Settings › General, or use
-Check for Updates… in the ⋯ menu or the icon's right-click menu.
+it's sandboxed without the outgoing-connections entitlement, and there is no
+updater in the app at all — the store delivers updates. There is no code path
+that could send your events, your habits or anything else off the Mac.
+`script/check-offline.sh` and `OfflineGuardTests` fail the build if this ever
+changes, including if an updater is added back.
 
 ## Features
 
@@ -109,70 +105,43 @@ Latte and writes the ten PNGs in `docs/`.
 `build-app.sh` signs with the first "Apple Development" identity in the
 keychain (override with `GLANCE_SIGN_IDENTITY`, or `-` for ad-hoc). A stable
 identity keeps the Calendar permission across rebuilds. The app is sandboxed
-with the calendars entitlement and the hardened runtime. It embeds
-`Sparkle.framework` (with its XPC services) in `Contents/Frameworks` and signs
-inside-out. Dev builds get a placeholder feed (`*.invalid`), so they never
-check for updates; `GLANCE_FEED_URL=… script/build-app.sh` overrides it.
-`script/check-offline.sh [Glance.app]` runs the offline guard.
+with the calendars entitlement and the hardened runtime, and there is nothing
+to embed beyond the app's own code. `script/check-offline.sh [Glance.app]`
+runs the offline guard.
 
 ## Releasing
 
-A release has three stages. Each can run on a different Mac; the
-`dist/Glance-<version>/` folder carries everything between them.
+Two steps, both described by files in `script/`.
 
-| Stage | Needs | Does |
+| Step | Needs | Does |
 |---|---|---|
-| `script/release.sh build 1.2.0` | this repo, Xcode 27, the Developer ID Application certificate | Release build (Developer ID, hardened runtime, secure timestamp, inside-out), offline check, zip with `ditto`, `manifest.env`, draft release notes, a copy of `notarize.sh` |
-| `dist/Glance-1.2.0/notarize.sh` | only the dist folder, Xcode or the Command Line Tools, a `notarytool` keychain profile | `notarytool submit --wait`, staple, `stapler validate` and `spctl` check, zip again |
-| `script/release.sh publish 1.2.0` | this repo, the Sparkle EdDSA key in the keychain, `gh` signed in | `generate_appcast` on the stapled zip (keeping older versions from the previous appcast), EdDSA check, GitHub release `v1.2.0` with the zip and `appcast.xml` |
+| `script/mas-build.sh` | this repo, Xcode 27, `xcodegen`, an Apple Distribution certificate and the "Glance Mac App Store" profile | Generates `Glance.xcodeproj` from `project.yml`, archives, refuses a build with a network entitlement or `get-task-allow`, then packages `build/mas/Glance.pkg` signed with the installer certificate |
+| `script/mas-build.sh --upload` | also an App Store Connect app record and the API key | `altool --validate-app`, then upload |
 
-Edit `dist/Glance-1.2.0/Glance-1.2.0.md` (the release notes; they're
-embedded in the appcast and used as the GitHub release body) before
-publishing. The build stage needs a clean tree: the release is tagged at the
-commit it was built from.
+Then set the version's text and screenshots in App Store Connect, attach the
+build, and submit. `script/release.sh tag 1.2.0` tags the commit the build came
+from, so a store version maps to a sha; `script/release.sh notes 1.2.0` prints
+the notes file from `dist/`.
 
-**Moving the dist folder between Macs.** Use `ditto`, which keeps the
-signatures, symlinks and extended attributes:
+There is no notarization step and no appcast: the App Store signs, hosts and
+updates the app. `notarize.sh`, `generate_appcast` and the EdDSA key are gone
+with the direct download they existed for.
 
-```sh
-ditto -c -k --keepParent dist/Glance-1.2.0 Glance-1.2.0-dist.zip   # on the build Mac
-# copy it over (AirDrop, scp, a shared drive), then on the notary Mac:
-ditto -x -k Glance-1.2.0-dist.zip . && Glance-1.2.0/notarize.sh
-# and back again; unpack into dist/ in this repo before publishing.
-```
+### One-time store setup
 
-**Notary profile (once per Mac).** `notarize.sh` uses the keychain profile in
-`$GLANCE_NOTARY_PROFILE` (default `glance`) and prints this command if it's
-missing:
+All of this is in the developer portal and App Store Connect, done once:
 
-```sh
-xcrun notarytool store-credentials glance --apple-id "<Apple ID email>" --team-id 4QJ25Y85MX
-```
-
-It asks for an app-specific password from account.apple.com.
-
-**EdDSA key.** Updates are signed with a Sparkle EdDSA key kept in the login
-keychain of the publishing Mac (the public half is `SUPublicEDKey` in
-`Resources/Info.plist`). It's never committed. Back it up somewhere safe,
-like a password manager, and restore it on another Mac:
-
-```sh
-.build/artifacts/sparkle/Sparkle/bin/generate_keys -x glance-sparkle-key.txt   # export
-.build/artifacts/sparkle/Sparkle/bin/generate_keys -f glance-sparkle-key.txt   # import
-rm glance-sparkle-key.txt
-```
-
-Losing it means existing installs can't verify new updates. (The tools
-appear after `swift package resolve`.)
-
-**Feed.** `SUFeedURL` is
-`https://github.com/steveafrost/Glance/releases/latest/download/appcast.xml`:
-GitHub redirects it to the `appcast.xml` asset of the newest release. That
-keeps the appcast next to the archives it lists, with no commit per release,
-and it changes the moment the release is published. A raw file on `main`
-would need a commit for every release and is cached by the CDN for a few
-minutes. The cost is that drafts and pre-releases never become "latest", so
-a beta channel would need its own feed.
+- **App ID** `com.steveafrost.Glance`. Calendar access is an entitlement, not
+  a portal capability, so there is nothing to tick.
+- **Mac App Store provisioning profile** named `Glance Mac App Store`, made of
+  that App ID and the Apple Distribution certificate.
+- **Certificates**: the existing Apple Distribution identity signs the app; a
+  `3rd Party Mac Developer Installer` identity signs the `.pkg`. The installer
+  certificate's key must be in the login keychain of whatever Mac packages the
+  build.
+- **App record** in App Store Connect. The API refuses to create this one
+  (`apps` allows only GET and UPDATE), so it has to be made in the web UI.
+- **Paid Apps agreement** active, or a $0.99 tier cannot be selected.
 
 ### Layout
 

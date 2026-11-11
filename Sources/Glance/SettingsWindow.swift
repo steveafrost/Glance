@@ -218,9 +218,6 @@ final class SettingsState: ObservableObject {
                 if key == "theme" { self?.refreshPalette() }
             }
         })
-        observers.append(NotificationCenter.default.addObserver(forName: Updater.didChange, object: nil, queue: .main) { [weak self] _ in
-            MainActor.assumeIsolated { self?.objectWillChange.send() }
-        })
         observers.append(NSApp.observe(\.effectiveAppearance) { [weak self] _, _ in
             DispatchQueue.main.async { self?.refreshPalette() }
         })
@@ -352,19 +349,6 @@ private struct GeneralSettings: View {
                 }
                 SettingsRow(label: "Show or hide calendar", caption: state.hotKeyError ?? "A shortcut that works in any app") {
                     HotKeyField(combo: state.binding(\.hotKey), error: $state.hotKeyError)
-                }
-                SettingsRow(label: "Automatically check for updates",
-                            caption: Updater.shared.isConfigured
-                                ? "Once a day. A separate Sparkle helper downloads updates; Glance itself stays offline."
-                                : "This build has no update feed.",
-                            disabled: !Updater.shared.isConfigured) {
-                    HStack(spacing: 8) {
-                        if Updater.shared.isConfigured {
-                            AccentLink(title: "Check Now") { Updater.shared.checkForUpdates(nil) }
-                        }
-                        ThemedSwitch(isOn: Binding(get: { Updater.shared.automaticallyChecks },
-                                                   set: { Updater.shared.automaticallyChecks = $0 }))
-                    }
                 }
             }
 
