@@ -26,6 +26,10 @@ ARCHIVE="${GLANCE_ARCHIVE:-build/mas/Glance.xcarchive}"
 EXPORT="${GLANCE_EXPORT:-build/mas/export}"
 PKG="${GLANCE_PKG:-build/mas/Glance.pkg}"
 
+MIN_OS=$(/usr/libexec/PlistBuddy -c 'Print :LSMinimumSystemVersion' \
+  Resources/Info.plist 2>/dev/null || echo 26.0)
+MIN_OS=${MIN_OS:-26.0}
+
 UPLOAD=0
 for a in "$@"; do
   case $a in
@@ -63,13 +67,43 @@ grep -q "com.apple.security.app-sandbox" <<<"$ENTS" || { echo "mas-build: $APP i
 [[ -f $APP/Contents/embedded.provisionprofile ]] || { echo "mas-build: no embedded profile" >&2; exit 1; }
 
 VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
-UNSIGNED="${PKG%.pkg}-unsigned.pkg"
+COMPONENT="${PKG%.pkg}-component.pkg"
+DISTDIR=$(cd "$(dirname "$PKG")" && pwd)
 
-# Package unsigned first, then sign. pkgbuild cannot combine --component with a
-# working --sign here: it leaves a stub package with an empty payload.
-echo "mas-build: packaging"
+# Two packages, not one. pkgbuild alone produces a component package, which
+# the App Store rejects as "not a valid format": it wants a product archive
+# with a distribution that names the install location and the minimum OS.
+echo "mas-build: packaging component"
 pkgbuild --component "$APP" --install-location /Applications \
-  --identifier com.steveafrost.Glance --version "$VERSION" "$UNSIGNED"
+  --identifier com.steveafrost.Glance --version "$VERSION" "$COMPONENT"
+
+cat > "$DISTDIR/distribution.xml" <<XML
+<?xml version="1.0" encoding="utf-8"?>
+<installer-gui-script minSpecVersion="2">
+    <title>Glance</title>
+    <organization>com.steveafrost</organization>
+    <!-- altool reads product-identifier and product-version from here. Without
+         them it fails 90230 "invalid product archive metadata" even though the
+         package itself is well formed. -->
+    <product id="com.steveafrost.Glance" version="$VERSION"/>
+    <domains enable_localSystem="true" enable_currentUserHome="false" enable_anywhere="false"/>
+    <options customize="never" require-scripts="false" hostArchitectures="arm64,x86_64"/>
+    <volume-check>
+        <allowed-os-versions>
+            <os-version min="$MIN_OS"/>
+        </allowed-os-versions>
+    </volume-check>
+    <pkg-ref id="com.steveafrost.Glance"/>
+    <choices-outline>
+        <line choice="default"><line choice="com.steveafrost.Glance"/></line>
+    </choices-outline>
+    <choice id="default"/>
+    <choice id="com.steveafrost.Glance" visible="false">
+        <pkg-ref id="com.steveafrost.Glance"/>
+    </choice>
+    <pkg-ref id="com.steveafrost.Glance" version="$VERSION" onConclusion="none">$(basename "$COMPONENT")</pkg-ref>
+</installer-gui-script>
+XML
 
 # The installer identity lives in its own keychain with a known password. From
 # the login keychain it is unusable unattended: productsign blocks in
@@ -79,10 +113,10 @@ INSTALLER_KC=${GLANCE_INSTALLER_KEYCHAIN:-$HOME/.appstoreconnect/mas-signing.key
 [[ -f $INSTALLER_KC ]] || { echo "mas-build: no installer keychain at $INSTALLER_KC (run script/mas-installer-keychain.sh)" >&2; exit 1; }
 security unlock-keychain -p "${GLANCE_INSTALLER_KEYCHAIN_PASSWORD:-}" "$INSTALLER_KC"
 
-echo "mas-build: signing"
-productsign --keychain "$INSTALLER_KC" \
-  --sign "3rd Party Mac Developer Installer: Steve Frost ($TEAM)" --timestamp \
-  "$UNSIGNED" "$PKG"
+echo "mas-build: signing product"
+productbuild --distribution "$DISTDIR/distribution.xml" --package-path "$DISTDIR" \
+  --resources "$DISTDIR" --keychain "$INSTALLER_KC" \
+  --sign "3rd Party Mac Developer Installer: Steve Frost ($TEAM)" "$PKG"
 
 pkgutil --check-signature "$PKG" | head -3
 

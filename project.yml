@@ -52,6 +52,11 @@ targets:
     platform: macOS
     sources:
       - path: Sources/Glance
+      # The icon has to be in the bundle or the App Store rejects the upload
+      # for a missing 512pt@2x image. It is a plain .icns, not an asset
+      # catalog, so it is listed as a resource copy.
+      - path: Resources/AppIcon.icns
+        buildPhase: resources
     dependencies:
       - target: GlanceCore
     settings:
