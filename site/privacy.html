@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en" data-flavor="mocha">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — Glance</title>
+<meta name="description" content="Glance collects nothing. It has no networking code and no permission to reach the internet.">
+<meta name="theme-color" content="#1e1e2e">
+<link rel="canonical" href="https://glancecal.com/privacy">
+<meta name="robots" content="index,follow">
+<meta property="og:type" content="website">
+<meta property="og:url" content="https://glancecal.com/privacy">
+<meta property="og:title" content="Privacy — Glance">
+<meta property="og:description" content="Glance collects nothing. It has no networking code and no permission to reach the internet.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='5' width='26' height='24' rx='6' fill='%23cba6f7'/%3E%3Crect x='3' y='5' width='26' height='8' rx='6' fill='%23b4befe'/%3E%3Ccircle cx='11' cy='20' r='2.4' fill='%231e1e2e'/%3E%3Ccircle cx='21' cy='20' r='2.4' fill='%231e1e2e' opacity='.55'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+<style>
+  .prose { max-width: 42rem; margin: 0 auto; padding: 4rem 1.5rem 6rem; }
+  .prose h1 { font-size: 2.1rem; margin-bottom: .4rem; }
+  .prose .updated { color: var(--subtext0); font-size: .9rem; margin-bottom: 2.6rem; }
+  .prose h2 { font-size: 1.15rem; margin: 2.4rem 0 .6rem; }
+  .prose p, .prose li { line-height: 1.65; color: var(--subtext1); }
+  .prose li { margin-bottom: .45rem; }
+  .prose a { color: var(--blue); }
+  .prose code { background: var(--surface0); padding: .1em .35em; border-radius: 4px; font-size: .92em; }
+</style>
+</head>
+<body>
+
+<nav class="bar">
+  <a class="wordmark" href="/" style="text-decoration:none;color:inherit">Glance</a>
+</nav>
+
+<main class="prose">
+  <h1>Privacy</h1>
+  <p class="updated">Last updated 11 November 2026</p>
+
+  <p>
+    Glance does not collect, transmit or share any information about you. This
+    is not a promise about how we behave; it is a property of how the app is
+    built, and you can check it.
+  </p>
+
+  <h2>What the app does with your data</h2>
+  <p>
+    Glance reads your calendars through macOS EventKit, the same system
+    framework Calendar.app uses. Events are read into memory and drawn on
+    screen. Nothing is written anywhere except the changes you make: when you
+    create or edit an event, Glance asks EventKit to save it to your calendar,
+    which is where it already lives.
+  </p>
+  <p>
+    The app stores its own settings — theme, menu bar format, which calendars
+    are visible — in your user defaults on your Mac. Those never leave the
+    machine.
+  </p>
+
+  <h2>No network access</h2>
+  <ul>
+    <li>The App Store build is sandboxed without a network entitlement, so
+      macOS itself prevents an outbound connection.</li>
+    <li>There is no analytics SDK, no crash reporter, and no third-party code
+      of any kind in the app.</li>
+    <li>Nothing is sent to us, because there is nowhere for it to go.</li>
+  </ul>
+  <p>
+    Updates are delivered by the App Store under Apple's terms, not by Glance.
+  </p>
+
+  <h2>What we do not do</h2>
+  <ul>
+    <li>No account, sign-in or email address is required or requested.</li>
+    <li>No usage data, diagnostics or telemetry is collected.</li>
+    <li>No advertising, tracking or profiling.</li>
+    <li>No data is sold or shared, because none is gathered.</li>
+  </ul>
+
+  <h2>Calendar access</h2>
+  <p>
+    macOS asks for permission before any app can read your calendars. You can
+    decline and Glance will still run, showing its month grid without events.
+    You can change your answer at any time in System&nbsp;Settings &rsaquo;
+    Privacy&nbsp;&amp;&nbsp;Security &rsaquo; Calendars.
+  </p>
+
+  <h2>This website</h2>
+  <p>
+    glancecal.com is a static site with no cookies, no analytics and no
+    third-party requests. It loads its fonts and images from its own domain.
+  </p>
+
+  <h2>Children</h2>
+  <p>
+    Glance is not directed at children and collects no personal information
+    from anyone, including children under 13.
+  </p>
+
+  <h2>Changes</h2>
+  <p>
+    If this policy ever changes, the date at the top changes with it. Because
+    the app cannot send data anywhere, a future version could only collect
+    something by adding networking code — which would be visible in the source
+    and in the app's entitlements.
+  </p>
+
+  <h2>Contact</h2>
+  <p>
+    Questions about privacy: <a href="mailto:hello@steveafrost.com">hello@steveafrost.com</a>.
+  </p>
+</main>
+
+<footer class="bar" style="justify-content:center">
+  <p style="font-size:.85rem;color:var(--subtext0);margin:0">
+    <a href="/" style="color:inherit">glancecal.com</a>
+  </p>
+</footer>
+
+</body>
+</html>
