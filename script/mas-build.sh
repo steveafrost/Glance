@@ -62,16 +62,29 @@ fi
 grep -q "com.apple.security.app-sandbox" <<<"$ENTS" || { echo "mas-build: $APP is not sandboxed" >&2; exit 1; }
 [[ -f $APP/Contents/embedded.provisionprofile ]] || { echo "mas-build: no embedded profile" >&2; exit 1; }
 
-# pkgbuild signs the component package directly. Exporting through xcodebuild
-# needs an existing App Store Connect record and stalls without one.
+VERSION=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' "$APP/Contents/Info.plist")
+UNSIGNED="${PKG%.pkg}-unsigned.pkg"
+
+# Package unsigned first, then sign. pkgbuild cannot combine --component with a
+# working --sign here: it leaves a stub package with an empty payload.
 echo "mas-build: packaging"
-pkgbuild --component "$APP" \
-  --install-location /Applications \
-  --identifier com.steveafrost.Glance \
-  --version "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
-               "$APP/Contents/Info.plist")" \
-  --sign "3rd Party Mac Developer Installer: Steve Frost ($TEAM)" \
-  "$PKG"
+pkgbuild --component "$APP" --install-location /Applications \
+  --identifier com.steveafrost.Glance --version "$VERSION" "$UNSIGNED"
+
+# The installer identity lives in its own keychain with a known password. From
+# the login keychain it is unusable unattended: productsign blocks in
+# SecurityServer::generateSignature on a GUI authorization prompt. See
+# script/mas-installer-keychain.sh to create it once.
+INSTALLER_KC=${GLANCE_INSTALLER_KEYCHAIN:-$HOME/.appstoreconnect/mas-signing.keychain-db}
+[[ -f $INSTALLER_KC ]] || { echo "mas-build: no installer keychain at $INSTALLER_KC (run script/mas-installer-keychain.sh)" >&2; exit 1; }
+security unlock-keychain -p "${GLANCE_INSTALLER_KEYCHAIN_PASSWORD:-}" "$INSTALLER_KC"
+
+echo "mas-build: signing"
+productsign --keychain "$INSTALLER_KC" \
+  --sign "3rd Party Mac Developer Installer: Steve Frost ($TEAM)" --timestamp \
+  "$UNSIGNED" "$PKG"
+
+pkgutil --check-signature "$PKG" | head -3
 
 echo "mas-build: $PKG"
 ls -la "$PKG"

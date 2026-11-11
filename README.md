@@ -136,9 +136,19 @@ All of this is in the developer portal and App Store Connect, done once:
 - **Mac App Store provisioning profile** named `Glance Mac App Store`, made of
   that App ID and the Apple Distribution certificate.
 - **Certificates**: the existing Apple Distribution identity signs the app; a
-  `3rd Party Mac Developer Installer` identity signs the `.pkg`. The installer
-  certificate's key must be in the login keychain of whatever Mac packages the
-  build.
+  `3rd Party Mac Developer Installer` identity signs the `.pkg`.
+- **Installer keychain**. The installer identity is imported into its own
+  keychain, not the login one, and `mas-installer-keychain.sh` sets it up:
+
+  ```sh
+  GLANCE_P12_PASSWORD=… GLANCE_INSTALLER_KEYCHAIN_PASSWORD=… \
+    script/mas-installer-keychain.sh ~/Downloads/installer.p12
+  ```
+
+  From the login keychain, `productsign` blocks in
+  `SecurityServer::generateSignature` on a GUI prompt that no unattended build
+  can answer. A keychain with a known password and a partition list avoids it.
+  `mas-build.sh` reads `GLANCE_INSTALLER_KEYCHAIN_PASSWORD`.
 - **App record** in App Store Connect. The API refuses to create this one
   (`apps` allows only GET and UPDATE), so it has to be made in the web UI.
 - **Paid Apps agreement** active, or a $0.99 tier cannot be selected.
