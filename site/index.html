@@ -4,13 +4,13 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Glance — a calendar in your menu bar</title>
-<meta name="description" content="A small native macOS menu bar calendar. Catppuccin themes, meeting join links, event editing. No account, no network access.">
-<meta name="theme-color" content="#1e1e2e">
+<meta name="description" content="A small native macOS menu bar calendar. Catppuccin themes, meeting join links, event editing. No account, no network access. $0.99 on the Mac App Store.">
+<meta name="theme-color"> content="#1e1e2e">
 <link rel="canonical" href="https://glancecal.com/">
 <meta property="og:type" content="website">
 <meta property="og:url" content="https://glancecal.com/">
 <meta property="og:title" content="Glance — a calendar in your menu bar">
-<meta property="og:description" content="A small native macOS menu bar calendar. Catppuccin themes, meeting join links, event editing. No account, no network access.">
+<meta property="og:description" content="A small native macOS menu bar calendar. Catppuccin themes, meeting join links, event editing. No account, no network access. $0.99 on the Mac App Store.">
 <meta property="og:image" content="https://glancecal.com/img/banner-mocha.png">
 <meta property="og:image:width" content="2560">
 <meta property="og:image:height" content="940">
@@ -40,15 +40,16 @@
       Catppuccin flavours.
     </p>
     <div class="actions">
-      <a class="btn primary" href="https://github.com/steveafrost/Glance/releases/latest/download/Glance-1.0.3.zip">
-        Download for macOS
-        <span class="btn-meta">1.0.3 · 1.9 MB</span>
+      <a class="btn primary" href="https://apps.apple.com/app/id6833298551">
+        Get it on the Mac App Store
+        <span class="btn-meta">$0.99 · macOS 26 or later</span>
       </a>
       <a class="btn ghost" href="https://github.com/steveafrost/Glance">Source on GitHub</a>
     </div>
     <p class="fineprint">
-      Requires macOS 26 or later. Signed with a Developer ID, notarized by Apple,
-      and it updates itself.
+      Requires macOS 26 or later. The App Store handles installation and
+      updates. Prefer to build it yourself? The full source is MIT-licensed and
+      on GitHub.
     </p>
   </div>
 
@@ -78,7 +79,7 @@
   </div>
   <div class="strip-item">
     <span class="strip-label">Built with</span>
-    <span class="strip-value">Swift 6, AppKit, one dependency</span>
+    <span class="strip-value">Swift 6, AppKit, no dependencies</span>
   </div>
 </section>
 
@@ -98,8 +99,8 @@
     <article>
       <h3>Meetings become one click</h3>
       <p>
-        Zoom, Meet, Teams and Webex links are found in an event's location, URL or
-        notes. The agenda grows a join button that opens the native app when you
+        Links from Zoom, Meet, Teams, Webex, Whereby and Chime are found in an
+        event's location, URL or notes. The agenda grows a join button that opens the native app when you
         have it, and highlights the call that is current or about to start.
         ⌘J joins.
       </p>
@@ -133,10 +134,11 @@
     </article>
 
     <article>
-      <h3>Honest about updates</h3>
+      <h3>Installed from the App Store</h3>
       <p>
-        Checks once a day. When one is waiting the menu item says so and the icon
-        gets a dot, rather than throwing a window in front of your work.
+        One supported binary, delivered by Apple and updated by Apple. The source
+        is public if you would rather read it or build it for yourself, but the
+        store build is the one that gets fixes.
       </p>
     </article>
   </div>
@@ -154,7 +156,7 @@
     <figure>
       <img class="shot" data-latte="img/settings-general-latte.png" data-dark="img/settings-general-mocha.png"
            src="img/settings-general-mocha.png" width="380"
-           alt="Settings, General tab: open at login, the show-or-hide shortcut, update checks, menu bar icon style, clock format, meeting lead time and agenda length.">
+           alt="Settings, General tab: open at login, the show-or-hide shortcut, menu bar icon style, clock format, meeting lead time and agenda length.">
       <figcaption>General</figcaption>
     </figure>
     <figure>
@@ -187,10 +189,9 @@
       could send anything anywhere.
     </p>
     <p>
-      Updates are the one exception, and they don't run inside the app: Sparkle's
-      separate Downloader service fetches the update feed and archive from this
-      project's GitHub Releases, with system profiling off. It learns nothing
-      about you.
+      There is no exception, and no updater inside the app. Updates arrive through
+      the App Store, which macOS handles for every app you install that way. The
+      store build ships without a networking entitlement at all.
     </p>
     <p class="muted">
       <code>script/check-offline.sh</code> and the offline guard tests fail the
@@ -210,10 +211,17 @@
 <section class="support">
   <div class="support-inner">
     <div>
-      <h2>Glance is free and MIT-licensed</h2>
+      <h2>$0.99 once, and the source is MIT</h2>
       <p>
-        No subscription, no upsell, no "pro". If it earns a place in your menu
-        bar and you feel like it, you can buy me a coffee.
+        No subscription, no upsell, no "pro" tier. A one-off 99 cents on the Mac
+        App Store pays for the signing certificate and the time it took.
+      </p>
+      <p>
+        The complete source is
+        <a href="https://github.com/steveafrost/Glance">on GitHub</a> under the
+        MIT licence, so you can read exactly what the app does, build it
+        yourself with Xcode, and change anything you like. Nothing is held back
+        for the paid build.
       </p>
     </div>
     <a class="bmc" href="https://buymeacoffee.com/stevefrost">
@@ -254,10 +262,28 @@
     </p>
   </details>
   <details>
-    <summary>What happens if I stop paying for the domain?</summary>
+    <summary>Can I build it from source instead?</summary>
     <p>
-      Nothing. The app is on GitHub Releases and updates come from there, so the
-      domain is only this page.
+      Yes. The repository is complete and MIT-licensed. You need Xcode 27 and
+      macOS 26 or later:
+    </p>
+    <pre class="build"><code>git clone https://github.com/steveafrost/Glance
+cd Glance
+script/test.sh          <span class="c"># 127 tests</span>
+script/build-app.sh     <span class="c"># build/Glance.app</span></code></pre>
+    <p>
+      It signs with whatever "Apple Development" identity is in your keychain, or
+      ad-hoc if there is none. A locally built copy is for your own use; the
+      store build is the one with a supported install path.
+    </p>
+  </details>
+  <details>
+    <summary>Why does it cost 99 cents?</summary>
+    <p>
+      It is the smallest price the App Store allows, and it covers the annual
+      developer fee and signing certificate. The source is still MIT and free to
+      build; the 99 cents buys the convenience of a signed, sandboxed, updated
+      copy.
     </p>
   </details>
   <details>
@@ -274,9 +300,9 @@
 <footer>
   <span>Glance — MIT © 2026 Steve Frost</span>
   <nav>
+    <a href="https://apps.apple.com/app/id6833298551">Mac App Store</a>
     <a href="https://github.com/steveafrost/Glance">GitHub</a>
-    <a href="https://github.com/steveafrost/Glance/releases">Releases</a>
-    <a href="https://github.com/steveafrost/Glance/blob/main/LICENSE">License</a>
+    <a href="https://github.com/steveafrost/Glance/blob/main/LICENSE">MIT License</a>
     <a href="https://buymeacoffee.com/stevefrost">Buy me a coffee</a>
   </nav>
   <span class="credits">
